@@ -1,0 +1,81 @@
+# ==============================================================================
+# Pre-commit hook configuration
+# See https://pre-commit.com            for more information
+# See https://pre-commit.com/hooks.html for more hooks
+# ==============================================================================
+repos:
+
+  # ==========================================================================
+  # Built-in hooks
+  # ==========================================================================
+  -   repo: git://github.com/pre-commit/pre-commit-hooks
+      rev: v2.2.3
+      hooks:
+        -   id: check-merge-conflict
+        -   id: check-yaml
+        -   id: end-of-file-fixer
+        -   id: trailing-whitespace
+
+    # ==========================================================================
+    # Golang Pre-Commit Hooks | https://github.com/tekwizely/pre-commit-golang
+    #
+    # Visit the project home page to learn more about the available Hooks,
+    # including useful arguments you might want to pass into them.
+    #
+    # Staged Files:
+    #   Unless configured to "always_run" (see below), hooks ONLY run when
+    #   maching file types (usually *.go) are staged.
+    #
+    # File-Based Hooks:
+    #   By default, hooks run against matching staged files individually.
+    #   Currently, file-based hooks DO NOT accept user-args.
+    #
+    # Repo-Based Hooks:
+    #   Hooks named '*-repo-*' only run once (if any matching files are staged).
+    #   They are NOT provided the list of staged files.
+    #   Generally, repo-based hooks DO accept user-args.
+    #
+    # Repo-Hook Suffixes:
+    #   *-repo     : Hook runs with no target argument
+    #                (good for adding custom arguments / targets)
+    #   *-repo-dir : Hook runs using './...' as target.
+    #   *-repo-pkg : Hook runs using '$(go list)/...' as target.
+    #
+    # Fix Suffix:
+    #   Hooks named `*-fix` fix (modify) files directly, when possible.
+    #
+    # Aliases:
+    #   Consider adding aliases to longer-named hooks for easier CLI usage.
+    #
+    # Useful Hook Parameters:
+    #   -   id: hook-id
+    #       alias: hook-alias       # Create an alias
+    #       args: [arg1, arg2, ...] # Pass arguments
+    #       always_run: true        # Run even if no matching files staged
+    # ==========================================================================
+  -   repo: https://github.com/tekwizely/pre-commit-golang
+      rev: v0.6.1
+      hooks:
+        -   id: go-build-mod
+            alias: build
+        -   id: go-test-mod
+            alias: test
+        -   id: go-vet-mod
+            alias: vet
+        -   id: go-fmt-fix
+            alias: fmt
+        #     -   id: go-imports-fix # replaces go-fmt-fix
+        #     -   id: go-returns-fix # replaces go-imports-fix & go-fmt-fix
+        -   id: go-lint
+            alias: lint
+        -   id: go-critic
+            alias: critic
+        #
+        # GolangCI-Lint
+        # - Fast Multi-Linter
+        # - Can be configured to replace MOST other hooks
+        # - Supports repo config file for configuration
+        # - https://github.com/golangci/golangci-lint
+        #
+        -   id: golangci-lint-dir-fix
+            alias: ci

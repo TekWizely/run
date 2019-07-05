@@ -62,6 +62,9 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	if id, ok := tryMatchScriptHeader(p); ok {
 		ctx.SetLexFn(lexScript)
 		if scriptText, ok := tryMatchScript(p); ok {
+			// Normalize the script
+			//
+			scriptText = normalizeCmdText(scriptText)
 			ctx.AST().commands[id] = &script{text: scriptText}
 			ctx.SetLexFn(lexMain)
 			return parseMain

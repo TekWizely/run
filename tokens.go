@@ -2,20 +2,51 @@ package main
 
 import (
 	"github.com/tekwizely/go-parsing/lexer"
-	"github.com/tekwizely/go-parsing/lexer/token"
 )
 
 // We define our lexer tokens starting from the pre-defined START token
 //
 const (
-	TokenID token.Type = lexer.TStart + iota
+	tokenID = lexer.TStart + iota
+	tokenDotID
 
 	tokenColon
-	tokenLParen
-	tokenRParen
+	tokenEquals
+
+	tokenDQuote
+	tokenDQStringStart
+	// tokenDQStringEnd
+
+	tokenSQuote
+	tokenSQStringStart
+	// tokenSQStringEnd
+
+	tokenRunes
+	tokenEscapeSequence
+
+	tokenDollar
 	tokenLBrace
 	tokenRBrace
+	tokenVarRefStart
+	// tokenVarRefEnd
+	tokenLParen
+	tokenRParen
+	tokenSubCmdStart
+	// tokenSubCmdEnd
 
 	tokenScriptLine
-	tokenEndScript
+	tokenScriptEnd
+
+	// tokenShell
+	// tokenShort
+	// tokenDesc
+	// tokenDescLine
+	// tokenDescEnd
+	// tokenUsage
+	// tokenArg
+	// tokenArgName
+	// tokenArgShort
+	// tokenArgLong
+	// tokenArgValue
+	// tokenArgDesc
 )

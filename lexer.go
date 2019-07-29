@@ -2,72 +2,62 @@ package main
 
 import (
 	"bytes"
-	"unicode"
+	"container/list"
 
 	"github.com/tekwizely/go-parsing/lexer"
 	"github.com/tekwizely/go-parsing/lexer/token"
 )
 
-// Runes
+// lexFn
 //
-const (
-	runeSpace   = ' '
-	runeTab     = '\t'
-	runeHash    = '#'
-	runeNewLine = '\n'
-	runeReturn  = '\r'
-	runeColon   = ':'
-	runeLParen  = '('
-	runeRParen  = ')'
-	runeLBrace  = '{'
-	runeRBrace  = '}'
-)
+type lexFn func(*lexContext, *lexer.Lexer) lexFn
 
-// Single-Rune tokens
+// lexContext
 //
-var (
-	singleRunes  = []byte{runeColon, runeLParen, runeRParen, runeLBrace, runeRBrace}
-	singleTokens = []token.Type{tokenColon, tokenLParen, tokenRParen, tokenLBrace, tokenRBrace}
-)
-
 type lexContext struct {
-	fn     lexer.Fn
-	tokens token.Nexter
+	fn      lexFn
+	fnStack *list.List
+	tokens  token.Nexter
 }
 
 // lex delegates incoming lexer calls to the configured fn
 //
-func (c *lexContext) lex(l *lexer.Lexer) lexer.Fn {
+func (ctx *lexContext) lex(l *lexer.Lexer) lexer.Fn {
+	fn := ctx.fn
 	// EOF ?
 	//
-	if c.fn == nil {
-		return nil
+	if fn == nil {
+		if ctx.fnStack.Len() == 0 {
+			return nil
+		}
+		fn = ctx.fnStack.Remove(ctx.fnStack.Back()).(lexFn)
 	}
-	c.fn = c.fn(l)
-	return c.lex
+	// assert(fn != nil)
+	ctx.fn = fn(ctx, l)
+	return ctx.lex
 }
 
-func (c *lexContext) Tokens() token.Nexter {
-	return c.tokens
-}
-
-// setFn configures the next lexer fn to delegate to
+// pushFn
 //
-func (c *lexContext) SetFn(fn lexer.Fn) {
-	c.fn = fn
+func (ctx *lexContext) pushFn(fn lexFn) {
+	ctx.fnStack.PushBack(fn)
 }
 
 // lex
 //
-func lex(content string) *lexContext {
-	ctx := &lexContext{fn: lexMain}
-	ctx.tokens = lexer.LexString(content, ctx.lex)
+func lex(fileBytes []byte) *lexContext {
+	reader := &readerIgnoreCR{r: bytes.NewReader(fileBytes)}
+	ctx := &lexContext{
+		fn:      lexMain,
+		fnStack: list.New(),
+	}
+	ctx.tokens = lexer.LexRuneReader(reader, ctx.lex)
 	return ctx
 }
 
 // lexMain
 //
-func lexMain(l *lexer.Lexer) lexer.Fn {
+func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 
 	// Single-char token?
 	//
@@ -78,28 +68,22 @@ func lexMain(l *lexer.Lexer) lexer.Fn {
 	}
 
 	switch {
-
 	// Comment
 	//
-	case tryMatchComment(l):
+	case matchComment(l):
 		l.Clear() // Discard the comment (for now)
-
-	// Whitespace
+	// Whitespace run
 	//
-	case l.CanPeek(1) && unicode.IsSpace(l.Peek(1)):
-		l.Next()
-		// Consume a run
-		//
-		if l.CanPeek(1) && unicode.IsSpace(l.Peek(1)) {
-			l.Next()
-		}
+	case matchOneOrMore(l, isSpaceOrTab) || matchNewline(l):
 		l.Clear() // Discard them all
-
+	// DotID
+	//
+	case matchDotID(l):
+		l.EmitToken(tokenDotID)
 	// ID
 	//
-	case tryMatchID(l):
-		l.EmitToken(TokenID)
-
+	case matchID(l):
+		l.EmitToken(tokenID)
 	// Unknown
 	//
 	default:
@@ -110,44 +94,223 @@ func lexMain(l *lexer.Lexer) lexer.Fn {
 	return lexMain
 }
 
-// lexScript Lexes one full line at a time
+// lexAssignmentValue delegates to other rValue lexers
+//
+func lexAssignmentValue(ctx *lexContext, l *lexer.Lexer) lexFn {
+	// Consume leading space
+	//
+	if matchOneOrMore(l, isSpaceOrTab) {
+		l.Clear() // Discard
+	}
+
+	switch l.Peek(1) {
+	// Does it look like a single-quoted string?
+	//
+	case '\'':
+		l.EmitType(tokenSQStringStart)
+	case '"':
+		l.EmitType(tokenDQStringStart)
+	case '$':
+		return lexDollarString
+	}
+	return lexUQString
+}
+
+// lexDollarString
+//
+func lexDollarString(ctx *lexContext, l *lexer.Lexer) lexFn {
+	if l.CanPeek(1) {
+		if l.Peek(1) == runeDollar {
+			if l.CanPeek(2) {
+				switch l.Peek(2) {
+				case runeLBrace:
+					l.EmitType(tokenVarRefStart)
+					return nil
+				case runeLParen:
+					l.EmitType(tokenSubCmdStart)
+					return nil
+				}
+			}
+		}
+	}
+	expectRune(l, runeDollar, "expecting dollar ('$')")
+	l.EmitType(tokenDollar)
+	return nil
+}
+
+// lexVarRef [ '$' '{' [A-Za-z0-9_.]* '}' ]
+//
+func lexVarRef(ctx *lexContext, l *lexer.Lexer) lexFn {
+	// Dollar
+	//
+	expectRune(l, runeDollar, "expecting dollar ('$')")
+	l.EmitType(tokenDollar)
+	// Open Brace
+	//
+	expectRune(l, runeLBrace, "expecting l-brace ('{')")
+	l.EmitType(tokenLBrace)
+	// Variable Name
+	//
+	matchZeroOrMore(l, isAlphaNumDotUnder)
+	l.EmitToken(tokenRunes) // Could be empty
+	// Close Brace
+	//
+	expectRune(l, runeRBrace, "expecting r-brace ('}')")
+	l.EmitType(tokenRBrace)
+
+	return nil
+}
+
+// lexSubCmd - [ '$' '(' [::print::] ')' ]
+//
+func lexSubCmd(ctx *lexContext, l *lexer.Lexer) lexFn {
+	// Dollar
+	//
+	expectRune(l, runeDollar, "expecting dollar ('$')")
+	l.EmitType(tokenDollar)
+	// Open Paren
+	//
+	expectRune(l, runeLParen, "expecting l-paren ('(')")
+	l.EmitType(tokenLParen)
+	// Keep going until we find close paren
+	//
+	for l.CanPeek(1) {
+		switch {
+		// Consume a run of printable, non-paren non-escape characters
+		//
+		case matchOneOrMore(l, isPrintNonParenNonBackslash):
+			l.EmitToken(tokenRunes)
+		// Back-slash '\'
+		//
+		case matchRune(l, runeBackSlash):
+			// In Shell mode, only '\', '(' and ')' are escapable
+			// Anything else is considered two separate characters
+			//
+			if matchRune(l, runeBackSlash, runeLParen, runeRParen) {
+				l.EmitToken(tokenEscapeSequence)
+			} else {
+				l.EmitToken(tokenRunes)
+			}
+		// Better be Close Paren ')'
+		//
+		default:
+			expectRune(l, runeRParen, "expecting r-paren (')')")
+			l.EmitType(tokenRParen)
+			return nil
+		}
+	}
+	return nil
+}
+
+// lexSQString lexes a Single-Quoted String
+// No escapable sequences in SQuotes, not even '\''
+//
+func lexSQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+	// Open quote
+	//
+	expectRune(l, runeSQuote, "expecting single-quote (\"'\")")
+	l.EmitType(tokenSQuote)
+	// Match quoted value as a one-shot
+	//
+	matchZeroOrMore(l, isPrintNonSQuote)
+	l.EmitToken(tokenRunes) // Could be empty
+	// Close quote
+	//
+	expectRune(l, runeSQuote, "expecting single-quote (\"'\")")
+	l.EmitType(tokenSQuote)
+
+	return nil
+}
+
+// lexDQString lexes a Double-Quoted String
+//
+func lexDQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+	// Open quote
+	//
+	expectRune(l, runeDQuote, "expecting double-quote ('\"')")
+	l.EmitType(tokenDQuote)
+	ctx.pushFn(lexEndDQString)
+	return lexDQStringElement
+}
+func lexEndDQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+	expectRune(l, runeDQuote, "expecting double-quote ('\"')")
+	l.EmitType(tokenDQuote)
+	return nil
+}
+
+func lexDQStringElement(ctx *lexContext, l *lexer.Lexer) lexFn {
+	switch {
+	// Consume a run of printable, non-quote non-escape characters
+	//
+	case matchOneOrMore(l, isPrintNonDQuoteNonBackslashNonDollar):
+		l.EmitToken(tokenRunes)
+	// Back-slash '\'
+	//
+	case matchRune(l, runeBackSlash):
+		// In DQuote mode, currently only '\', '"' and '$' are escapable
+		// Anything else is considered two separate characters
+		//
+		if matchRune(l, runeBackSlash, runeDQuote, runeDollar) {
+			l.EmitToken(tokenEscapeSequence)
+		} else {
+			l.EmitToken(tokenRunes)
+		}
+	case l.CanPeek(1) && l.Peek(1) == runeDollar:
+		ctx.pushFn(lexDQStringElement)
+		return lexDollarString
+
+	default:
+		return nil
+	}
+	return lexDQStringElement
+}
+
+// lexUQString
+//
+func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+	matchZeroOrMore(l, isPrintNonSpace)
+	l.EmitToken(tokenRunes) // Could be empty
+	return nil
+}
+
+// lexScriptBody Lexes one full line at a time
 // Expects to enter fn at start of a line
 //
-func lexScript(l *lexer.Lexer) lexer.Fn {
+func lexScriptBody(ctx *lexContext, l *lexer.Lexer) lexFn {
 	// EOF terminates Script
 	//
 	if !l.CanPeek(1) {
-		l.EmitType(tokenEndScript)
+		l.EmitType(tokenScriptEnd)
 		return nil
 	}
 	// Blank line is part of script
+	// Need to check this before !whitespace
 	//
-	if tryMatchNewline(l) {
+	if matchNewline(l) {
 		l.EmitToken(tokenScriptLine)
-		return lexScript
+		return lexScriptBody
 	}
 	// !whitespace at beginning of non-blank line terminates script
 	//
-	if !tryMatchSpaceOrTab(l) {
-		l.EmitType(tokenEndScript)
+	if !matchRune(l, runeSpace, runeTab) {
+		l.EmitType(tokenScriptEnd)
 		return nil
 	}
-	// We have a scrip line
+	// We have a script line
 	// Consume the full line, including eol/eof
 	//
-	for !tryMatchNewline(l) {
+	for !matchNewline(l) {
 		l.Next()
 	}
 	l.EmitToken(tokenScriptLine)
-	return lexScript
+	return lexScriptBody
 }
 
-// tryMatchComment
+// matchComment
 //
-func tryMatchComment(l *lexer.Lexer) bool {
-	if l.CanPeek(1) && l.Peek(1) == runeHash {
-		l.Next()
-		for !tryMatchNewlineOrEOF(l) {
+func matchComment(l *lexer.Lexer) bool {
+	if matchRune(l, runeHash) {
+		for !matchNewlineOrEOF(l) {
 			l.Next()
 		}
 		return true
@@ -155,85 +318,55 @@ func tryMatchComment(l *lexer.Lexer) bool {
 	return false
 }
 
-// tryMatchNewlineOrEOF
+// matchNewline
+// We will attempt to match 3 newline styles: [ "\n", "\r", "\r\n" ]
+// TODO Not sure we need [ '\r' | '\r\n' ] check since this generally a linux tool
 //
-func tryMatchNewlineOrEOF(l *lexer.Lexer) bool {
-	if tryMatchNewline(l) {
+func matchNewline(l *lexer.Lexer) bool {
+	if matchRune(l, runeNewline) {
+		return true
+	}
+	if matchRune(l, runeReturn) {
+		matchRuneOrNone(l, runeNewline)
+		return true
+	}
+	return false
+}
+
+// matchNewlineOrEOF
+//
+func matchNewlineOrEOF(l *lexer.Lexer) bool {
+	if matchNewline(l) {
 		return true
 	}
 	return !l.CanPeek(1)
 }
 
-// tryMatchNewline
-// We will attempt to match 3 newline styles: [ "\n", "\r", "\r\n" ]
-// TODO Not sure we need '\r | \r\n' check since this generally a linux tool
+// matchDotID matches [ '\.' [a-zA-Z] [a-zA-Z0-9_]* ( \. [a-zA-Z0-9_]+ )*
 //
-func tryMatchNewline(l *lexer.Lexer) bool {
-	if l.CanPeek(1) {
-		switch l.Peek(1) {
-		// Newline '\n'
-		//
-		case runeNewLine:
-			l.Next()
-			return true
-
-		// Return '\r', optionally followed by newLine '\n'
-		//
-		case runeReturn:
-			l.Next()
-			if l.CanPeek(1) && l.Peek(1) == runeNewLine {
-				l.Next()
-			}
-			return true
+func matchDotID(l *lexer.Lexer) (ok bool) {
+	m := l.Marker()
+	// If we don't match then reset
+	//
+	defer func() {
+		if !ok {
+			m.Apply()
 		}
-
-	}
-	return false
-}
-
-// tryMatchID
-//
-func tryMatchID(l *lexer.Lexer) bool {
-	if tryMatchAlpha(l) {
-		for tryMatchAlphaNum(l) {
+	}()
+	if matchRune(l, runeDot) && matchOne(l, isAlpha) {
+		matchZeroOrMore(l, isAlphaNum)
+		for matchRune(l, runeDot) {
+			if !matchOneOrMore(l, isAlphaNum) {
+				return ok
+			}
 		}
 		return true
 	}
 	return false
 }
 
-// tryMatchAlpha
+// matchID
 //
-func tryMatchAlpha(l *lexer.Lexer) bool {
-	if l.CanPeek(1) {
-		if r := l.Peek(1); (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-			l.Next()
-			return true
-		}
-	}
-	return false
-}
-
-// tryMatchAlphaNum
-//
-func tryMatchAlphaNum(l *lexer.Lexer) bool {
-	if l.CanPeek(1) {
-		if r := l.Peek(1); (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-			l.Next()
-			return true
-		}
-	}
-	return false
-}
-
-// tryMatchSpaceOrTab
-//
-func tryMatchSpaceOrTab(l *lexer.Lexer) bool {
-	if l.CanPeek(1) {
-		if r := l.Peek(1); r == runeSpace || r == runeTab {
-			l.Next()
-			return true
-		}
-	}
-	return false
+func matchID(l *lexer.Lexer) bool {
+	return matchOne(l, isAlphaUnder) && matchZeroOrMore(l, isAlphaNumUnder)
 }

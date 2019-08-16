@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"container/list"
+	"strings"
 
 	"github.com/tekwizely/go-parsing/lexer"
 	"github.com/tekwizely/go-parsing/lexer/token"
@@ -31,8 +32,10 @@ func (ctx *lexContext) lex(l *lexer.Lexer) lexer.Fn {
 			return nil
 		}
 		fn = ctx.fnStack.Remove(ctx.fnStack.Back()).(lexFn)
+		traceFn("Popped lexer function", fn)
 	}
 	// assert(fn != nil)
+	traceFn("Calling lexer function", fn)
 	ctx.fn = fn(ctx, l)
 	return ctx.lex
 }
@@ -41,6 +44,7 @@ func (ctx *lexContext) lex(l *lexer.Lexer) lexer.Fn {
 //
 func (ctx *lexContext) pushFn(fn lexFn) {
 	ctx.fnStack.PushBack(fn)
+	traceFn("Pushed lexer function", fn)
 }
 
 // lex
@@ -59,15 +63,25 @@ func lex(fileBytes []byte) *lexContext {
 //
 func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 
-	// Single-char token?
+	switch {
+	// :=
 	//
-	if i := bytes.IndexRune(singleRunes, l.Peek(1)); i >= 0 {
+	case l.CanPeek(2) && l.Peek(1) == runeColon && l.Peek(2) == runeEquals:
+		l.Next() // :
+		l.Next() // =
+		l.EmitType(tokenColonEquals)
+	// ?=
+	//
+	case l.CanPeek(2) && l.Peek(1) == runeQMark && l.Peek(2) == runeEquals:
+		l.Next() // ?
+		l.Next() // =
+		l.EmitType(tokenQMarkEquals)
+	// Single-Char Token - Check AFTER multi-char tokens
+	//
+	case bytes.ContainsRune(singleRunes, l.Peek(1)):
+		i := bytes.IndexRune(singleRunes, l.Peek(1))
 		l.Next()                    // Match the rune
 		l.EmitType(singleTokens[i]) // Emit just the type, discarding the matched rune
-		return lexMain
-	}
-
-	switch {
 	// Comment
 	//
 	case matchComment(l):
@@ -83,7 +97,12 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 	// ID
 	//
 	case matchID(l):
-		l.EmitToken(tokenID)
+		name := strings.ToUpper(l.PeekToken())
+		if t, ok := mainTokens[name]; ok {
+			l.EmitType(t)
+		} else {
+			l.EmitToken(tokenID)
+		}
 	// Unknown
 	//
 	default:
@@ -108,8 +127,10 @@ func lexAssignmentValue(ctx *lexContext, l *lexer.Lexer) lexFn {
 	//
 	case '\'':
 		l.EmitType(tokenSQStringStart)
+		return lexSQString
 	case '"':
 		l.EmitType(tokenDQStringStart)
+		return lexDQString
 	case '$':
 		return lexDollarString
 	}
@@ -232,12 +253,17 @@ func lexDQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 	ctx.pushFn(lexEndDQString)
 	return lexDQStringElement
 }
+
+// lexEndDQString
+//
 func lexEndDQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 	expectRune(l, runeDQuote, "expecting double-quote ('\"')")
 	l.EmitType(tokenDQuote)
 	return nil
 }
 
+// lexDQStringElement
+//
 func lexDQStringElement(ctx *lexContext, l *lexer.Lexer) lexFn {
 	switch {
 	// Consume a run of printable, non-quote non-escape characters
@@ -273,28 +299,183 @@ func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
-// lexScriptBody Lexes one full line at a time
-// Expects to enter fn at start of a line
+// lexCmdDesc
 //
-func lexScriptBody(ctx *lexContext, l *lexer.Lexer) lexFn {
-	// EOF terminates Script
-	//
-	if !l.CanPeek(1) {
-		l.EmitType(tokenScriptEnd)
+func lexCmdDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreEmptyLines(l)
+	ignoreLeadingSpace(l)
+	m := l.Marker()
+	if matchRune(l, runeHash) {
+		l.Clear() // Clear # + Leading Space
+		l.EmitType(tokenHash)
+		ignoreSpace(l)
+		matchZeroOrMore(l, isPrintNonReturn)
+		l.EmitToken(tokenRunes)
+		return lexCmdDesc
+	}
+	m.Apply()
+	l.EmitType(tokenConfigDescEnd)
+	return nil
+}
+
+// lexCmdAttr
+//
+func lexCmdAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreEmptyLines(l)
+	ignoreLeadingSpace(l)
+	m := l.Marker()
+	if matchID(l) {
+		name := strings.ToUpper(l.PeekToken())
+		if t, ok := cmdConfigTokens[name]; ok {
+			l.EmitType(t)
+			return lexCmdAttr
+		}
+		l.EmitErrorf("Unrecognized command attribute: %s", name)
 		return nil
 	}
+	m.Apply()
+	l.EmitType(tokenConfigEnd)
+	return nil
+}
+
+// lexCmdShell
+//
+func lexCmdShell(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreSpace(l)
+	if matchID(l) {
+		l.EmitToken(tokenID)
+	}
+	return nil
+}
+
+// lexCmdUsage
+//
+func lexCmdUsage(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreSpace(l)
+	matchZeroOrMore(l, isPrintNonReturn)
+	l.EmitToken(tokenRunes)
+	return nil
+}
+
+// lexCmdOpt: name [-l] [--long] [<label>] ["desc"]
+//
+func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreSpace(l)
+
+	// ID
+	//
+	if !matchID(l) {
+		l.EmitError("Expecting option name")
+		return nil
+	}
+	l.EmitToken(tokenConfigOptName)
+
+	// Whitespace
+	//
+	ignoreSpace(l)
+
+	// First '-' : Might be short or long
+	//
+	expectRune(l, runeDash, "Expecting '-'")
+	l.Clear()
+
+	expectLong := true
+
+	// Short flag?
+	//
+	if matchOne(l, isAlphaNum) {
+		l.EmitToken(tokenConfigOptShort)
+
+		// Whitespace
+		//
+		ignoreSpace(l)
+
+		expectLong = matchRune(l, runeComma)
+		l.Clear()
+
+		if expectLong {
+			// Whitespace
+			//
+			ignoreSpace(l)
+			// First '-'
+			//
+			expectRune(l, runeDash, "Expecting '-'")
+			l.Clear()
+		}
+	}
+
+	// Long flag?
+	//
+	if expectLong {
+		// Second '-'
+		//
+		expectRune(l, runeDash, "Expecting '-'")
+		l.Clear()
+		if matchOneOrMore(l, isAlphaNum) {
+			l.EmitToken(tokenConfigOptLong)
+		} else {
+			l.EmitError("Expecting long flag name")
+		}
+	}
+
+	// Whitespace
+	//
+	ignoreSpace(l)
+
+	// Value?
+	//
+	if matchRune(l, runeLAngle) {
+		l.Clear()
+		matchOneOrMore(l, isConfigOptValue)
+		l.EmitToken(tokenConfigOptValue)
+		expectRune(l, runeRAngle, "Expecting '>'")
+		l.Clear()
+	}
+
+	// Whitespace
+	//
+	ignoreSpace(l)
+
+	// Desc?
+	//
+	if r, ok := tryPeekRune(l); ok && r == runeDQuote {
+		l.EmitType(tokenDQStringStart)
+	}
+
+	return nil
+}
+
+// lexCmdScript
+//
+func lexCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
+	// Open Brace
+	//
+	expectRune(l, runeLBrace, "expecting '{'")
+	l.EmitType(tokenLBrace)
+	// Discard whitespace to EOL
+	//
+	matchZeroOrMore(l, isSpaceOrTab)
+	matchNewlineOrEOF(l)
+	l.Clear()
+	ctx.pushFn(lexEndCmdScript)
+	return lexCmdScriptLine
+}
+
+// lexCmdScriptLine Lexes one full line at a time
+// Expects to enter fn at start of a line
+//
+func lexCmdScriptLine(ctx *lexContext, l *lexer.Lexer) lexFn {
 	// Blank line is part of script
 	// Need to check this before !whitespace
 	//
 	if matchNewline(l) {
 		l.EmitToken(tokenScriptLine)
-		return lexScriptBody
+		return lexCmdScriptLine
 	}
 	// !whitespace at beginning of non-blank line terminates script
 	//
-	if !matchRune(l, runeSpace, runeTab) {
-		l.EmitType(tokenScriptEnd)
-		return nil
+	if !matchOneOrMore(l, isSpaceOrTab) {
+		return lexEndCmdScript
 	}
 	// We have a script line
 	// Consume the full line, including eol/eof
@@ -303,7 +484,18 @@ func lexScriptBody(ctx *lexContext, l *lexer.Lexer) lexFn {
 		l.Next()
 	}
 	l.EmitToken(tokenScriptLine)
-	return lexScriptBody
+	return lexCmdScriptLine
+}
+
+// lexEndCmdScript
+//
+func lexEndCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
+	expectRune(l, runeRBrace, "expecting '}'")
+	l.EmitType(tokenRBrace)
+	matchZeroOrMore(l, isSpaceOrTab)
+	matchNewlineOrEOF(l)
+	l.Clear()
+	return nil
 }
 
 // matchComment

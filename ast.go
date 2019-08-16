@@ -20,10 +20,6 @@ func (a *ast) add(n astNode) {
 		a.commands[c.name] = struct{}{}
 	}
 }
-func (a *ast) hasCommand(c string) bool {
-	_, ok := a.commands[c]
-	return ok
-}
 
 // newAST
 //
@@ -36,19 +32,55 @@ func newAST() *ast {
 // astNode
 //
 type astNode interface {
-	Resolve(r *runfile)
+	Apply(r *runfile)
+}
+
+// astValueElement
+//
+type astValueElement interface {
+	Apply(r *runfile) string
+}
+
+// astValue
+//
+type astValue struct {
+	value []astValueElement
+}
+
+// Apply
+//
+func (a *astValue) Apply(r *runfile) string {
+	b := &strings.Builder{}
+	if a != nil {
+		for _, v := range a.value {
+			b.WriteString(v.Apply(r))
+		}
+	}
+	return b.String()
+}
+
+// newAstValue
+//
+func newAstValue(value []astValueElement) *astValue {
+	return &astValue{value: value}
+}
+
+// newAstValue1
+//
+func newAstValue1(value astValueElement) *astValue {
+	return &astValue{value: []astValueElement{value}}
 }
 
 // astCmd
 //
 type astCmd struct {
 	name   string
-	shell  string
+	config *astCmdConfig
 	script []string
 }
 
-func (a *astCmd) Resolve(r *runfile) {
-	cmd := &runCmd{name: a.name, shell: a.shell, script: a.script}
+func (a *astCmd) Apply(r *runfile) {
+	cmd := &runCmd{name: a.name, script: a.script}
 	// attrs
 	//
 	cmd.attrs = make(map[string]string)
@@ -61,43 +93,92 @@ func (a *astCmd) Resolve(r *runfile) {
 	for k, v := range r.env {
 		cmd.env[k] = v
 	}
+	// Config
+	//
+	cmd.config = &runCmdConfig{}
+	cmd.config.shell = a.config.shell
+	// Config Desc
+	//
+	for _, desc := range a.config.desc {
+		cmd.config.desc = append(cmd.config.desc, desc.Apply(r))
+	}
+	// Config Usages
+	//
+	for _, usage := range a.config.usages {
+		cmd.config.usages = append(cmd.config.usages, usage.Apply(r))
+	}
+	// Config Opts
+	//
+	for _, opt := range a.config.opts {
+		cmd.config.opts = append(cmd.config.opts, opt.Apply(r))
+	}
 	r.cmds[cmd.name] = cmd
+}
+
+// astCmdConfig
+//
+type astCmdConfig struct {
+	shell  string
+	desc   []*astValue
+	usages []*astValue
+	opts   []*astCmdOpt
+}
+
+type astCmdOpt struct {
+	name  string
+	short rune
+	long  string
+	value string
+	desc  *astValue
+}
+
+func (a *astCmdOpt) Apply(r *runfile) *runCmdOpt {
+	opt := &runCmdOpt{}
+	opt.name = a.name
+	opt.short = a.short
+	opt.long = a.long
+	opt.value = a.value
+	opt.desc = a.desc.Apply(r)
+	return opt
 }
 
 // astAttrAssignment
 //
 type astAttrAssignment struct {
 	name  string
-	value []astValueElement
+	value *astValue
 }
 
-func (a *astAttrAssignment) Resolve(r *runfile) {
-	b := &strings.Builder{}
-	for _, v := range a.value {
-		b.WriteString(v.Resolve(r))
-	}
-	r.attrs[a.name] = b.String()
+func (a *astAttrAssignment) Apply(r *runfile) {
+	r.attrs[a.name] = a.value.Apply(r)
 }
 
 // astEnvAssignment
 //
 type astEnvAssignment struct {
 	name  string
-	value []astValueElement
+	value *astValue
 }
 
-func (a *astEnvAssignment) Resolve(r *runfile) {
-	b := &strings.Builder{}
-	for _, v := range a.value {
-		b.WriteString(v.Resolve(r))
-	}
-	r.env[a.name] = b.String()
+func (a *astEnvAssignment) Apply(r *runfile) {
+	r.env[a.name] = a.value.Apply(r)
 }
 
-// astValueElement
+// astEnvQAssignment
 //
-type astValueElement interface {
-	Resolve(r *runfile) string
+type astEnvQAssignment struct {
+	name  string
+	value *astValue
+}
+
+func (a *astEnvQAssignment) Apply(r *runfile) {
+	// Only assign if not already present+non-empty
+	//
+	if val, ok := r.env[a.name]; !ok || len(val) == 0 {
+		if val, ok = os.LookupEnv(a.name); !ok || len(val) == 0 {
+			r.env[a.name] = a.value.Apply(r)
+		}
+	}
 }
 
 // astValueRunes
@@ -106,7 +187,13 @@ type astValueRunes struct {
 	runes string
 }
 
-func (a *astValueRunes) Resolve(r *runfile) string {
+// newAstValueRunes
+//
+func newAstValueRunes(runes string) *astValueRunes {
+	return &astValueRunes{runes: runes}
+}
+
+func (a *astValueRunes) Apply(r *runfile) string {
 	return a.runes
 }
 
@@ -116,7 +203,7 @@ type astValueEsc struct {
 	seq string
 }
 
-func (a *astValueEsc) Resolve(r *runfile) string {
+func (a *astValueEsc) Apply(r *runfile) string {
 	return string([]rune(a.seq)[1]) // TODO A bit of a hack
 }
 
@@ -126,7 +213,7 @@ type astValueVar struct {
 	varName string
 }
 
-func (a *astValueVar) Resolve(r *runfile) string {
+func (a *astValueVar) Apply(r *runfile) string {
 	if val, ok := r.env[a.varName]; ok {
 		return val
 	}
@@ -142,20 +229,13 @@ func (a *astValueVar) Resolve(r *runfile) string {
 // astValueShell
 //
 type astValueShell struct {
-	cmd []astValueElement
+	cmd *astValue
 }
 
-func (a *astValueShell) Resolve(r *runfile) string {
+func (a *astValueShell) Apply(r *runfile) string {
+	cmd := a.cmd.Apply(r)
 	b := &strings.Builder{}
-	for _, v := range a.cmd {
-		b.WriteString(v.Resolve(r))
-	}
-	cmd := b.String()
-
-	b.Reset()
-
 	executeSubCommand(r.attrs[".SHELL"], cmd, r.env, b)
-
 	result := b.String()
 
 	// Trim trailing newlines

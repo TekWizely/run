@@ -19,7 +19,10 @@ const (
 	runeHash      = '#'
 	runeDollar    = '$'
 	runeDot       = '.'
+	runeComma     = ','
+	runeDash      = '-'
 	runeEquals    = '='
+	runeQMark     = '?'
 	runeColon     = ':'
 	runeBackSlash = '\\'
 	runeDQuote    = '"'
@@ -28,6 +31,8 @@ const (
 	runeRParen    = ')'
 	runeLBrace    = '{'
 	runeRBrace    = '}'
+	runeLAngle    = '<'
+	runeRAngle    = '>'
 )
 
 // Single-Rune tokens
@@ -36,6 +41,19 @@ var (
 	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace}
 	singleTokens = []token.Type{tokenColon, tokenEquals, tokenLParen, tokenRParen, tokenLBrace, tokenRBrace}
 )
+var mainTokens = map[string]token.Type{
+	"COMMAND": tokenCommand,
+	"CMD":     tokenCommand,
+}
+
+// Cmd Config Tokens
+//
+var cmdConfigTokens = map[string]token.Type{
+	// "SHELL":tokenConfigShell,
+	"USAGE":  tokenConfigUsage,
+	"OPTION": tokenConfigOpt,
+	"OPT":    tokenConfigOpt,
+}
 
 func isAlpha(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
@@ -65,13 +83,21 @@ func isPrintNonSpace(r rune) bool {
 	return unicode.IsPrint(r) && !unicode.IsSpace(r)
 }
 
+func isPrintNonReturn(r rune) bool {
+	return unicode.IsPrint(r) && r != '\r' && r != '\n'
+}
+
+func isConfigOptValue(r rune) bool {
+	return unicode.IsPrint(r) && r != '\r' && r != '\n' && r != '\t' && r != '<' && r != '>'
+}
+
 func isPrintNonSQuote(r rune) bool {
 	return r != runeSQuote && unicode.IsPrint(r)
 }
 
-// func isPrintNonDQuoteNonBackslash(r rune) bool {
-// 	return r != runeDQuote && r != runeBackSlash && unicode.IsPrint(r)
-// }
+func isPrintNonDQuoteNonBackslash(r rune) bool {
+	return r != runeDQuote && r != runeBackSlash && unicode.IsPrint(r)
+}
 
 func isPrintNonDQuoteNonBackslashNonDollar(r rune) bool {
 	return r != runeDQuote && r != runeBackSlash && r != runeDollar && unicode.IsPrint(r)
@@ -97,7 +123,7 @@ func expectRune(l *lexer.Lexer, r rune, msg string) {
 	l.Next()
 }
 
-// // ReaderIgnoreCR wraps a RuneReader, filtering out '\r'
+// // ReaderIgnoreCR wraps a RuneReader, filtering errOut '\r'
 // // Useful for input sources that use '\r'+'\n' for end-of-line
 // //
 // func ReaderIgnoreCR(r io.RuneReader) io.RuneReader {

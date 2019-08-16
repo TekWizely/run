@@ -34,8 +34,10 @@ func (ctx *parseContext) parse(p *parser.Parser) parser.Fn {
 			return nil
 		}
 		fn = ctx.fnStack.Remove(ctx.fnStack.Front()).(parseFn)
+		traceFn("Popped parser function", fn)
 	}
 	// assert(fn != nil)
+	traceFn("Calling parser function", fn)
 	ctx.fn = fn(ctx, p)
 	return ctx.parse
 }
@@ -44,6 +46,7 @@ func (ctx *parseContext) parse(p *parser.Parser) parser.Fn {
 //
 func (ctx *parseContext) setLexFn(fn lexFn) {
 	ctx.l.fn = fn
+	traceFn("Set lexer function", fn)
 }
 
 // pushLexFn
@@ -52,11 +55,12 @@ func (ctx *parseContext) pushLexFn(fn lexFn) {
 	ctx.l.pushFn(fn)
 }
 
-// // pushFn
-// //
-// func (c *parseContext) pushFn(fn parseFn) {
-// 	c.fnStack.PushBack(fn)
-// }
+// pushFn
+//
+func (ctx *parseContext) pushFn(fn parseFn) {
+	ctx.fnStack.PushBack(fn)
+	traceFn("Pushed parser function", fn)
+}
 
 // parse
 //
@@ -77,11 +81,17 @@ func parse(l *lexContext) *ast {
 // parseMain
 //
 func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
+	var (
+		name      string
+		shell     string
+		valueList *astValue
+		ok        bool
+	)
 	// DotAssignment
 	//
-	if name, ok := tryMatchDotAssignmentStart(p); ok {
+	if name, ok = tryMatchDotAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.fn)
-		if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
+		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
 			// Let's go ahead and normalize this now
 			//
 			name = strings.ToUpper(name)
@@ -92,27 +102,46 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	}
 	// Assignment
 	//
-	if name, ok := tryMatchAssignmentStart(p); ok {
+	if name, ok = tryMatchAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.fn)
-		if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
+		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
 			ctx.ast.add(&astEnvAssignment{name: name, value: valueList})
 			return parseMain
 		}
 		panic("expecting assignment value")
 	}
-	// Script Header
+	// QAssignment
 	//
-	if name, shell, ok := tryMatchScriptHeader(p); ok {
+	if name, ok = tryMatchQAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.fn)
-		if body, ok := tryMatchScriptBody(ctx, p); ok {
-			// Normalize the script
-			//
-			body = normalizeCmdText(body)
-			ctx.ast.add(&astCmd{name: name, shell: shell, script: body})
-			ctx.setLexFn(lexMain)
+		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
+			ctx.ast.add(&astEnvQAssignment{name: name, value: valueList})
 			return parseMain
 		}
-		panic("Error parsing script for command '" + name + "'")
+		panic("expecting assignment value")
+	}
+	// Command
+	//
+	if name, shell, ok = tryMatchCmdHeaderWithShell(p); ok {
+		ctx.pushLexFn(ctx.l.fn)
+		// Config
+		//
+		config := expectCmdConfig(ctx, p)
+		if len(shell) > 0 {
+			if len(config.shell) > 0 && shell != config.shell {
+				panic(fmt.Sprintf("Shell '%s' defined in cmd header, shell '%s' defined in attributes", shell, config.shell))
+			}
+			config.shell = shell
+		}
+		// Script
+		//
+		script := expectCmdScript(ctx, p)
+		// Normalize the script
+		//
+		script = normalizeCmdScript(script)
+		ctx.ast.add(&astCmd{name: name, config: config, script: script})
+		ctx.setLexFn(lexMain)
+		return parseMain
 	}
 	panic("Expecting command header")
 }
@@ -122,13 +151,9 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 func tryMatchDotAssignmentStart(p *parser.Parser) (string, bool) {
 	if p.CanPeek(2) &&
 		p.PeekType(1) == tokenDotID &&
-		p.PeekType(2) == tokenEquals {
-		// Grab the name
-		//
+		p.PeekType(2) == tokenColonEquals {
 		name := p.Next().Value()
-		// Discard the '='
-		//
-		expectTokenType(p, tokenEquals, "Expecting tokenEquals ('=')")
+		expectTokenType(p, tokenColonEquals, "Expecting tokenColonEquals (':=')")
 		p.Clear()
 		return name, true
 	}
@@ -140,13 +165,23 @@ func tryMatchDotAssignmentStart(p *parser.Parser) (string, bool) {
 func tryMatchAssignmentStart(p *parser.Parser) (string, bool) {
 	if p.CanPeek(2) &&
 		p.PeekType(1) == tokenID &&
-		p.PeekType(2) == tokenEquals {
-		// Grab the name
-		//
+		p.PeekType(2) == tokenColonEquals {
 		name := p.Next().Value()
-		// Discard the '='
-		//
-		expectTokenType(p, tokenEquals, "Expecting tokenEquals ('=')")
+		expectTokenType(p, tokenColonEquals, "Expecting tokenColonEquals (':=')")
+		p.Clear()
+		return name, true
+	}
+	return "", false
+}
+
+// tryMatchQAssignmentStart
+//
+func tryMatchQAssignmentStart(p *parser.Parser) (string, bool) {
+	if p.CanPeek(2) &&
+		p.PeekType(1) == tokenID &&
+		p.PeekType(2) == tokenQMarkEquals {
+		name := p.Next().Value()
+		expectTokenType(p, tokenQMarkEquals, "Expecting tokenQMarkEquals ('?=')")
 		p.Clear()
 		return name, true
 	}
@@ -155,10 +190,10 @@ func tryMatchAssignmentStart(p *parser.Parser) (string, bool) {
 
 // tryMatchAssignmentValue
 //
-func tryMatchAssignmentValue(ctx *parseContext, p *parser.Parser) ([]astValueElement, bool) {
+func tryMatchAssignmentValue(ctx *parseContext, p *parser.Parser) (*astValue, bool) {
 	ctx.setLexFn(lexAssignmentValue)
 	if !p.CanPeek(1) {
-		return []astValueElement{}, false
+		return newAstValue([]astValueElement{}), false
 	}
 	switch p.PeekType(1) {
 	case tokenSQStringStart:
@@ -178,30 +213,30 @@ func tryMatchAssignmentValue(ctx *parseContext, p *parser.Parser) ([]astValueEle
 		panic(fmt.Sprintf("%d:%d: $ must be followed by '{' or '('", t.Line(), t.Column()))
 	default:
 		value := expectTokenType(p, tokenRunes, "expecting tokenRunes").Value()
-		return []astValueElement{&astValueRunes{runes: value}}, true
+		return newAstValue([]astValueElement{&astValueRunes{runes: value}}), true
 	}
 }
 
-// func tryMatchDollarString(ctx *parseContext, p *parser.Parser) ([]astValueElement, bool) {
-// 	ctx.setLexFn(lexDollarString)
-// 	if !p.CanPeek(1) {
-// 		return []astValueElement{}, false
-// 	}
-// 	switch p.PeekType(1) {
-// 	case tokenVarRefStart:
-// 		p.Next()
-// 		return expectVarRef(ctx, p), true
-// 	case tokenSubCmdStart:
-// 		p.Next()
-// 		return expectSubCmd(ctx, p), true
-// 	case tokenDollar:
-// 		t := p.Next()
-// 		panic(fmt.Sprintf("%d:%d: $ must be followed by '{' or '('", t.Line(), t.Column()))
-// 	}
-// 	return []astValueElement{}, false
-// }
+func tryMatchDollarString(ctx *parseContext, p *parser.Parser) (*astValue, bool) {
+	ctx.setLexFn(lexDollarString)
+	if !p.CanPeek(1) {
+		return newAstValue([]astValueElement{}), false
+	}
+	switch p.PeekType(1) {
+	case tokenVarRefStart:
+		p.Next()
+		return expectVarRef(ctx, p), true
+	case tokenSubCmdStart:
+		p.Next()
+		return expectSubCmd(ctx, p), true
+	case tokenDollar:
+		t := p.Next()
+		panic(fmt.Sprintf("%d:%d: $ must be followed by '{' or '('", t.Line(), t.Column()))
+	}
+	return newAstValue([]astValueElement{}), false
+}
 
-func expectVarRef(ctx *parseContext, p *parser.Parser) []astValueElement {
+func expectVarRef(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexVarRef)
 	// Dollar
 	//
@@ -216,10 +251,10 @@ func expectVarRef(ctx *parseContext, p *parser.Parser) []astValueElement {
 	//
 	expectTokenType(p, tokenRBrace, "expecting tokenRBrace ('}')")
 
-	return []astValueElement{&astValueVar{varName: value}}
+	return newAstValue([]astValueElement{&astValueVar{varName: value}})
 }
 
-func expectSubCmd(ctx *parseContext, p *parser.Parser) []astValueElement {
+func expectSubCmd(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexSubCmd)
 	// Dollar
 	//
@@ -246,13 +281,13 @@ func expectSubCmd(ctx *parseContext, p *parser.Parser) []astValueElement {
 		//
 		default:
 			expectTokenType(p, tokenRParen, "expecting tokenRParen (')')")
-			return []astValueElement{&astValueShell{cmd: value}}
+			return newAstValue([]astValueElement{&astValueShell{cmd: newAstValue(value)}})
 		}
 	}
 	panic("expecting tokenRParen (')')")
 }
 
-func expectSQString(ctx *parseContext, p *parser.Parser) []astValueElement {
+func expectSQString(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexSQString)
 	// Open Quote
 	//
@@ -264,10 +299,10 @@ func expectSQString(ctx *parseContext, p *parser.Parser) []astValueElement {
 	//
 	expectTokenType(p, tokenSQuote, "expecting tokenSingleQuote (\"'\")")
 
-	return []astValueElement{&astValueRunes{runes: value}}
+	return newAstValue([]astValueElement{&astValueRunes{runes: value}})
 }
 
-func expectDQString(ctx *parseContext, p *parser.Parser) []astValueElement {
+func expectDQString(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexDQString)
 	// Open Quote
 	//
@@ -289,10 +324,10 @@ func expectDQString(ctx *parseContext, p *parser.Parser) []astValueElement {
 			value = append(value, &astValueEsc{seq: p.Next().Value()})
 		case tokenVarRefStart:
 			p.Next()
-			value = append(value, expectVarRef(ctx, p)[0])
+			value = append(value, expectVarRef(ctx, p))
 		case tokenSubCmdStart:
 			p.Next()
-			value = append(value, expectSubCmd(ctx, p)[0])
+			value = append(value, expectSubCmd(ctx, p))
 		case tokenDollar:
 			p.Next()
 			value = append(value, &astValueRunes{runes: "$"})
@@ -300,25 +335,28 @@ func expectDQString(ctx *parseContext, p *parser.Parser) []astValueElement {
 		//
 		default:
 			expectTokenType(p, tokenDQuote, "expecting tokenDoubleQuote ('\"')")
-			return value
+			return newAstValue(value)
 		}
 	}
 	panic("expecting tokenDoubleQuote ('\"')")
 }
 
-// tryMatchScriptHeader matches [ ID ( '(' ID ')' )? ':' ]
+// tryMatchCmdHeaderWithShell matches [ ID ( '(' ID ')' )? ':' ]
 //
-func tryMatchScriptHeader(p *parser.Parser) (string, string, bool) {
-	if p.CanPeek(2) &&
-		p.PeekType(1) == tokenID &&
-		(p.PeekType(2) == tokenColon || p.PeekType(2) == tokenLParen) {
+func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
+	if p.CanPeek(3) &&
+		p.PeekType(1) == tokenCommand &&
+		p.PeekType(2) == tokenID &&
+		(p.PeekType(3) == tokenColon || p.PeekType(3) == tokenLParen) {
+		expectTokenType(p, tokenCommand, "Expecting tokenCommand")
 		// Grab the name
 		//
 		name := p.Next().Value()
 		// Is Shell present?
 		//
 		var shell string
-		if _, ok := tryTokenType(p, tokenLParen); ok {
+		if tryPeekType(p, tokenLParen) {
+			expectTokenType(p, tokenLParen, "Expecting tokenLParen ('(')")
 			shell = expectTokenType(p, tokenID, "Expecting tokenID").Value()
 			expectTokenType(p, tokenRParen, "Expecting tokenRParen (')')")
 		}
@@ -329,28 +367,100 @@ func tryMatchScriptHeader(p *parser.Parser) (string, string, bool) {
 	return "", "", false
 }
 
-// tryMatchScriptBody
+// expectCmdConfig
 //
-func tryMatchScriptBody(ctx *parseContext, p *parser.Parser) ([]string, bool) {
-	ctx.setLexFn(lexScriptBody)
+func expectCmdConfig(ctx *parseContext, p *parser.Parser) *astCmdConfig {
+	config := &astCmdConfig{}
+	// Desc is always first, if present
+	//
+	ctx.setLexFn(lexCmdDesc)
+	for !tryPeekType(p, tokenConfigDescEnd) {
+		expectTokenType(p, tokenHash, "Expecting tokenHash ('#')")
+		desc := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
+		config.desc = append(config.desc, newAstValue1(newAstValueRunes(desc.Value())))
+		p.Clear()
+	}
+	expectTokenType(p, tokenConfigDescEnd, "Expecting tokenConfigDescEnd")
+
+	ctx.setLexFn(lexCmdAttr)
+	for !tryPeekType(p, tokenConfigEnd) {
+		t := p.Peek(1)
+		switch t.Type() {
+		case tokenConfigShell:
+			p.Next()
+			if config.shell != "" {
+				panic(fmt.Sprintf("%d:%d: SHELL already defined", t.Line(), t.Column()))
+			}
+			ctx.pushLexFn(ctx.l.fn)
+			ctx.setLexFn(lexCmdShell)
+			shell := expectTokenType(p, tokenID, "Expecting tokenID")
+			config.shell = shell.Value()
+		// case tokenConfigDesc:
+		// 	p.Next()
+		// 	if len(config.desc) > 0 {
+		// 		panic(fmt.Sprintf("%d:%d: DESC already defined", t.Line(), t.Column()))
+		// 	}
+		// 	ctx.pushLexFn(ctx.l.fn)
+		// 	ctx.setLexFn(lexCmdDesc)
+		// 	desc := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
+		// 	config.desc = desc.Value()
+		case tokenConfigUsage:
+			p.Next()
+			ctx.pushLexFn(ctx.l.fn)
+			ctx.setLexFn(lexCmdUsage)
+			usage := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
+			config.usages = append(config.usages, newAstValue1(newAstValueRunes(usage.Value())))
+		case tokenConfigOpt:
+			p.Next()
+			opt := &astCmdOpt{}
+			ctx.pushLexFn(ctx.l.fn)
+			ctx.setLexFn(lexCmdOpt)
+			opt.name = expectTokenType(p, tokenConfigOptName, "Expecting tokenConfigOptName").Value()
+			if tryPeekType(p, tokenConfigOptShort) {
+				opt.short = []rune(p.Next().Value())[0]
+			}
+			if tryPeekType(p, tokenConfigOptLong) {
+				opt.long = p.Next().Value()
+			}
+			if tryPeekType(p, tokenConfigOptValue) {
+				opt.value = p.Next().Value()
+			}
+			if tryPeekType(p, tokenDQStringStart) {
+				p.Next()
+				opt.desc = expectDQString(ctx, p)
+			}
+			config.opts = append(config.opts, opt)
+		default:
+			panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
+		}
+	}
+	expectTokenType(p, tokenConfigEnd, "Expecting tokenConfigEnd")
+	p.Clear()
+	return config
+}
+
+// expectCmdScript
+//
+func expectCmdScript(ctx *parseContext, p *parser.Parser) []string {
+	ctx.setLexFn(lexCmdScript)
+	// Open Brace
+	//
+	expectTokenType(p, tokenLBrace, "expecting tokenLBrace ('{')")
+	// Script Body
+	//
 	var scriptText []string
 	for p.CanPeek(1) && p.PeekType(1) == tokenScriptLine {
 		scriptText = append(scriptText, p.Next().Value())
 	}
-	// If not EOF, then expect tokenScriptEnd
+	// Close Brace
 	//
-	if p.CanPeek(1) {
-		expectTokenType(p, tokenScriptEnd, "Expecting tokenScriptEnd")
-	}
+	expectTokenType(p, tokenRBrace, "expecting tokenRBrace ('}')")
 	p.Clear()
-	return scriptText, len(scriptText) > 0
+	return scriptText
 }
 
-func tryTokenType(p *parser.Parser, typ token.Type) (token.Token, bool) {
-	if p.CanPeek(1) && p.PeekType(1) == typ {
-		return p.Next(), true
-	}
-	return nil, false
+func tryPeekType(p *parser.Parser, typ token.Type) bool {
+	return p.CanPeek(1) && p.PeekType(1) == typ
 }
 
 func expectTokenType(p *parser.Parser, typ token.Type, msg string) token.Token {

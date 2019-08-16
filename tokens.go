@@ -12,41 +12,39 @@ const (
 
 	tokenColon
 	tokenEquals
+	tokenColonEquals // :=
+	tokenQMarkEquals // ?=
 
 	tokenDQuote
 	tokenDQStringStart
-	// tokenDQStringEnd
 
 	tokenSQuote
 	tokenSQStringStart
-	// tokenSQStringEnd
 
 	tokenRunes
 	tokenEscapeSequence
 
+	tokenHash
 	tokenDollar
 	tokenLBrace
 	tokenRBrace
 	tokenVarRefStart
-	// tokenVarRefEnd
 	tokenLParen
 	tokenRParen
 	tokenSubCmdStart
-	// tokenSubCmdEnd
+
+	tokenCommand
+
+	tokenConfigShell
+	tokenConfigDescEnd
+	tokenConfigUsage
+	tokenConfigOpt
+	tokenConfigOptName
+	tokenConfigOptShort
+	tokenConfigOptLong
+	tokenConfigOptValue
+
+	tokenConfigEnd
 
 	tokenScriptLine
-	tokenScriptEnd
-
-	// tokenShell
-	// tokenShort
-	// tokenDesc
-	// tokenDescLine
-	// tokenDescEnd
-	// tokenUsage
-	// tokenArg
-	// tokenArgName
-	// tokenArgShort
-	// tokenArgLong
-	// tokenArgValue
-	// tokenArgDesc
 )

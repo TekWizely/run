@@ -87,6 +87,49 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		valueList *astValue
 		ok        bool
 	)
+	// Export
+	//
+	if tryPeekType(p, tokenExport) {
+		p.Next()
+		ctx.pushLexFn(ctx.l.fn)
+		ctx.setLexFn(lexExport)
+		name = expectTokenType(p, tokenID, "Expecting tokenID").Value()
+		switch {
+		// '=' | ':=''
+		//
+		case tryPeekType(p, tokenEquals):
+			p.Next()
+			if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
+				ctx.ast.add(&astVarAssignment{name: name, value: valueList})
+				ctx.ast.add(&astExport{names: []string{name}})
+			} else {
+				panic("expecting assignment value")
+			}
+		// '?='
+		//
+		case tryPeekType(p, tokenQMarkEquals):
+			p.Next()
+			if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
+				ctx.ast.add(&astVarQAssignment{name: name, value: valueList})
+				ctx.ast.add(&astExport{names: []string{name}})
+			} else {
+				panic("expecting assignment value")
+			}
+		// ','
+		//
+		default:
+			export := &astExport{}
+			export.names = append(export.names, name)
+			for tryPeekType(p, tokenComma) {
+				p.Next()
+				name = expectTokenType(p, tokenID, "Expecting tokenID").Value()
+				export.names = append(export.names, name)
+			}
+			ctx.ast.add(export)
+		}
+		p.Clear()
+		return parseMain
+	}
 	// DotAssignment
 	//
 	if name, ok = tryMatchDotAssignmentStart(p); ok {
@@ -100,22 +143,22 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		}
 		panic("expecting assignment value")
 	}
-	// Assignment
+	// Variable Assignment
 	//
 	if name, ok = tryMatchAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.fn)
 		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-			ctx.ast.add(&astEnvAssignment{name: name, value: valueList})
+			ctx.ast.add(&astVarAssignment{name: name, value: valueList})
 			return parseMain
 		}
 		panic("expecting assignment value")
 	}
-	// QAssignment
+	// Variable QAssignment
 	//
 	if name, ok = tryMatchQAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.fn)
 		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-			ctx.ast.add(&astEnvQAssignment{name: name, value: valueList})
+			ctx.ast.add(&astVarQAssignment{name: name, value: valueList})
 			return parseMain
 		}
 		panic("expecting assignment value")
@@ -140,7 +183,6 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		//
 		script = normalizeCmdScript(script)
 		ctx.ast.add(&astCmd{name: name, config: config, script: script})
-		ctx.setLexFn(lexMain)
 		return parseMain
 	}
 	panic("Expecting command header")
@@ -151,9 +193,9 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 func tryMatchDotAssignmentStart(p *parser.Parser) (string, bool) {
 	if p.CanPeek(2) &&
 		p.PeekType(1) == tokenDotID &&
-		p.PeekType(2) == tokenColonEquals {
+		p.PeekType(2) == tokenEquals {
 		name := p.Next().Value()
-		expectTokenType(p, tokenColonEquals, "Expecting tokenColonEquals (':=')")
+		expectTokenType(p, tokenEquals, "Expecting tokenEquals ('=' | ':=')")
 		p.Clear()
 		return name, true
 	}
@@ -165,9 +207,9 @@ func tryMatchDotAssignmentStart(p *parser.Parser) (string, bool) {
 func tryMatchAssignmentStart(p *parser.Parser) (string, bool) {
 	if p.CanPeek(2) &&
 		p.PeekType(1) == tokenID &&
-		p.PeekType(2) == tokenColonEquals {
+		p.PeekType(2) == tokenEquals {
 		name := p.Next().Value()
-		expectTokenType(p, tokenColonEquals, "Expecting tokenColonEquals (':=')")
+		expectTokenType(p, tokenEquals, "Expecting tokenEquals ('=' | ':=')")
 		p.Clear()
 		return name, true
 	}
@@ -213,7 +255,7 @@ func tryMatchAssignmentValue(ctx *parseContext, p *parser.Parser) (*astValue, bo
 		panic(fmt.Sprintf("%d:%d: $ must be followed by '{' or '('", t.Line(), t.Column()))
 	default:
 		value := expectTokenType(p, tokenRunes, "expecting tokenRunes").Value()
-		return newAstValue([]astValueElement{&astValueRunes{runes: value}}), true
+		return newAstValue([]astValueElement{&astValueRunes{value: value}}), true
 	}
 }
 
@@ -251,7 +293,7 @@ func expectVarRef(ctx *parseContext, p *parser.Parser) *astValue {
 	//
 	expectTokenType(p, tokenRBrace, "expecting tokenRBrace ('}')")
 
-	return newAstValue([]astValueElement{&astValueVar{varName: value}})
+	return newAstValue([]astValueElement{&astValueVar{name: value}})
 }
 
 func expectSubCmd(ctx *parseContext, p *parser.Parser) *astValue {
@@ -272,7 +314,7 @@ func expectSubCmd(ctx *parseContext, p *parser.Parser) *astValue {
 		// Character run
 		//
 		case tokenRunes:
-			value = append(value, &astValueRunes{runes: p.Next().Value()})
+			value = append(value, &astValueRunes{value: p.Next().Value()})
 		// Escape char
 		//
 		case tokenEscapeSequence:
@@ -299,7 +341,7 @@ func expectSQString(ctx *parseContext, p *parser.Parser) *astValue {
 	//
 	expectTokenType(p, tokenSQuote, "expecting tokenSingleQuote (\"'\")")
 
-	return newAstValue([]astValueElement{&astValueRunes{runes: value}})
+	return newAstValue([]astValueElement{&astValueRunes{value: value}})
 }
 
 func expectDQString(ctx *parseContext, p *parser.Parser) *astValue {
@@ -317,7 +359,7 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *astValue {
 		// Character run
 		//
 		case tokenRunes:
-			value = append(value, &astValueRunes{runes: p.Next().Value()})
+			value = append(value, &astValueRunes{value: p.Next().Value()})
 		// Escape char
 		//
 		case tokenEscapeSequence:
@@ -330,7 +372,7 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *astValue {
 			value = append(value, expectSubCmd(ctx, p))
 		case tokenDollar:
 			p.Next()
-			value = append(value, &astValueRunes{runes: "$"})
+			value = append(value, &astValueRunes{value: "$"})
 		// Close quote
 		//
 		default:
@@ -377,7 +419,7 @@ func expectCmdConfig(ctx *parseContext, p *parser.Parser) *astCmdConfig {
 	for !tryPeekType(p, tokenConfigDescEnd) {
 		expectTokenType(p, tokenHash, "Expecting tokenHash ('#')")
 		desc := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
-		config.desc = append(config.desc, newAstValue1(newAstValueRunes(desc.Value())))
+		config.desc = append(config.desc, newAstCmdAstValue1(newAstValueRunes(desc.Value())))
 		p.Clear()
 	}
 	expectTokenType(p, tokenConfigDescEnd, "Expecting tokenConfigDescEnd")
@@ -409,7 +451,7 @@ func expectCmdConfig(ctx *parseContext, p *parser.Parser) *astCmdConfig {
 			ctx.pushLexFn(ctx.l.fn)
 			ctx.setLexFn(lexCmdUsage)
 			usage := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
-			config.usages = append(config.usages, newAstValue1(newAstValueRunes(usage.Value())))
+			config.usages = append(config.usages, newAstCmdAstValue1(newAstValueRunes(usage.Value())))
 		case tokenConfigOpt:
 			p.Next()
 			opt := &astCmdOpt{}
@@ -430,6 +472,44 @@ func expectCmdConfig(ctx *parseContext, p *parser.Parser) *astCmdConfig {
 				opt.desc = expectDQString(ctx, p)
 			}
 			config.opts = append(config.opts, opt)
+		case tokenConfigExport:
+			p.Next()
+			ctx.pushLexFn(ctx.l.fn)
+			ctx.setLexFn(lexExport)
+			name := expectTokenType(p, tokenID, "Expecting tokenID")
+			switch {
+			// '=' | ':=''
+			//
+			case tryPeekType(p, tokenEquals):
+				p.Next()
+				// ctx.pushLexFn(ctx.l.fn)
+				if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
+					config.env = append(config.env, &astCmdEnvAssignment{name: name.Value(), value: valueList})
+				} else {
+					panic("expecting assignment value")
+				}
+			// '?='
+			//
+			case tryPeekType(p, tokenQMarkEquals):
+				p.Next()
+				// ctx.pushLexFn(ctx.l.fn)
+				if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
+					config.env = append(config.env, &astCmdEnvQAssignment{name: name.Value(), value: valueList})
+				} else {
+					panic("expecting assignment value")
+				}
+			// ','
+			//
+			default:
+				export := &astCmdExport{}
+				export.names = append(export.names, name.Value())
+				for tryPeekType(p, tokenComma) {
+					p.Next()
+					name = expectTokenType(p, tokenID, "Expecting tokenID")
+					export.names = append(export.names, name.Value())
+				}
+				config.exports = append(config.exports, export)
+			}
 		default:
 			panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
 		}

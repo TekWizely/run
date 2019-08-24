@@ -313,7 +313,7 @@ func listCommands() {
 
 // runHelp
 //
-func runHelp(rf *runfile) {
+func runHelp(_ *runfile) {
 	cmdName := "help"
 	// Command?
 	//

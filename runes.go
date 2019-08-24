@@ -44,6 +44,7 @@ var (
 var mainTokens = map[string]token.Type{
 	"COMMAND": tokenCommand,
 	"CMD":     tokenCommand,
+	"EXPORT":  tokenExport,
 }
 
 // Cmd Config Tokens
@@ -53,6 +54,7 @@ var cmdConfigTokens = map[string]token.Type{
 	"USAGE":  tokenConfigUsage,
 	"OPTION": tokenConfigOpt,
 	"OPT":    tokenConfigOpt,
+	"EXPORT": tokenConfigExport,
 }
 
 func isAlpha(r rune) bool {
@@ -112,6 +114,10 @@ func tryPeekRune(l *lexer.Lexer) (rune, bool) {
 		return l.Peek(1), true
 	}
 	return utf8.RuneError, false
+}
+
+func peekRuneEquals(l *lexer.Lexer, r rune) bool {
+	return l.CanPeek(1) && l.Peek(1) == r
 }
 
 func expectRune(l *lexer.Lexer, r rune, msg string) {

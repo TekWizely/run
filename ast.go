@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"strings"
 )
@@ -35,10 +36,22 @@ type astNode interface {
 	Apply(r *runfile)
 }
 
+// astCmdNode
+//
+type astCmdNode interface {
+	Apply(r *runfile, c *runCmd)
+}
+
 // astValueElement
 //
 type astValueElement interface {
 	Apply(r *runfile) string
+}
+
+// astCmdValueElement
+//
+type astCmdValueElement interface {
+	Apply(r *runfile, c *runCmd) string
 }
 
 // astValue
@@ -71,6 +84,16 @@ func newAstValue1(value astValueElement) *astValue {
 	return &astValue{value: []astValueElement{value}}
 }
 
+// astExport
+//
+type astExport struct {
+	names []string
+}
+
+func (a *astExport) Apply(r *runfile) {
+	r.exports = append(r.exports, a.names...)
+}
+
 // astCmd
 //
 type astCmd struct {
@@ -81,17 +104,41 @@ type astCmd struct {
 
 func (a *astCmd) Apply(r *runfile) {
 	cmd := &runCmd{name: a.name, script: a.script}
+	// Exports - copy vars into cmd env
+	// Setup cmd env first so its accessible from other cmd configs
+	// Copy global exports first
+	//
+	cmd.env = make(map[string]string)
+	for _, name := range r.exports {
+		if value, ok := r.vars[name]; ok {
+			cmd.env[name] = value
+		} else {
+			panic("Unknown variable for export: " + name)
+		}
+	}
+	// Copy cmd exports
+	// NOTE: There could be dupes but should be safe
+	//
+	for _, exports := range a.config.exports {
+		for _, name := range exports.names {
+			if value, ok := r.vars[name]; ok {
+				cmd.env[name] = value
+			} else {
+				panic("Unknown variable for export: " + name)
+			}
+		}
+	}
+	// Config Environment
+	//
+	for _, value := range a.config.env {
+		value.Apply(r, cmd)
+	}
+
 	// attrs
 	//
 	cmd.attrs = make(map[string]string)
 	for k, v := range r.attrs {
 		cmd.attrs[k] = v
-	}
-	// env
-	//
-	cmd.env = make(map[string]string)
-	for k, v := range r.env {
-		cmd.env[k] = v
 	}
 	// Config
 	//
@@ -100,12 +147,12 @@ func (a *astCmd) Apply(r *runfile) {
 	// Config Desc
 	//
 	for _, desc := range a.config.desc {
-		cmd.config.desc = append(cmd.config.desc, desc.Apply(r))
+		cmd.config.desc = append(cmd.config.desc, desc.Apply(r, cmd))
 	}
 	// Config Usages
 	//
 	for _, usage := range a.config.usages {
-		cmd.config.usages = append(cmd.config.usages, usage.Apply(r))
+		cmd.config.usages = append(cmd.config.usages, usage.Apply(r, cmd))
 	}
 	// Config Opts
 	//
@@ -118,12 +165,16 @@ func (a *astCmd) Apply(r *runfile) {
 // astCmdConfig
 //
 type astCmdConfig struct {
-	shell  string
-	desc   []*astValue
-	usages []*astValue
-	opts   []*astCmdOpt
+	shell   string
+	desc    []*astCmdValue
+	usages  []*astCmdValue
+	opts    []*astCmdOpt
+	exports []*astCmdExport
+	env     []astCmdNode
 }
 
+// astCmdOpt
+//
 type astCmdOpt struct {
 	name  string
 	short rune
@@ -142,6 +193,86 @@ func (a *astCmdOpt) Apply(r *runfile) *runCmdOpt {
 	return opt
 }
 
+// astCmdExport
+//
+type astCmdExport struct {
+	names []string
+}
+
+// astCmdValue
+//
+type astCmdValue struct {
+	value []astCmdValueElement
+}
+
+// Apply
+//
+func (a *astCmdValue) Apply(r *runfile, c *runCmd) string {
+	b := &strings.Builder{}
+	if a != nil {
+		for _, v := range a.value {
+			b.WriteString(v.Apply(r, c))
+		}
+	}
+	return b.String()
+}
+
+// newAstCmdValue
+//
+func newAstCmdValue(value []astCmdValueElement) *astCmdValue {
+	return &astCmdValue{value: value}
+}
+
+// newAstCmdValue1
+//
+func newAstCmdValue1(value astCmdValueElement) *astCmdValue {
+	return &astCmdValue{value: []astCmdValueElement{value}}
+}
+
+// astCmdAstValue wraps and astValue in an astCmdValue
+//
+type astCmdAstValue struct {
+	value *astValue
+}
+
+// Apply
+//
+func (a *astCmdAstValue) Apply(r *runfile, c *runCmd) string {
+	return a.value.Apply(r)
+}
+
+// newAstCmdAstValue1
+//
+func newAstCmdAstValue1(value astValueElement) *astCmdValue {
+	return &astCmdValue{value: []astCmdValueElement{&astCmdAstValue{value: newAstValue1(value)}}}
+}
+
+// astCmdEnvAssignment
+//
+type astCmdEnvAssignment struct {
+	name  string
+	value *astValue
+}
+
+func (a *astCmdEnvAssignment) Apply(r *runfile, c *runCmd) {
+	c.env[a.name] = a.value.Apply(r)
+}
+
+// astCmdEnvQAssignment
+//
+type astCmdEnvQAssignment struct {
+	name  string
+	value *astValue
+}
+
+func (a *astCmdEnvQAssignment) Apply(r *runfile, c *runCmd) {
+	// Only assign if not already present+non-empty
+	//
+	if val, ok := r.vars[a.name]; !ok || len(val) == 0 {
+		c.env[a.name] = a.value.Apply(r)
+	}
+}
+
 // astAttrAssignment
 //
 type astAttrAssignment struct {
@@ -153,30 +284,30 @@ func (a *astAttrAssignment) Apply(r *runfile) {
 	r.attrs[a.name] = a.value.Apply(r)
 }
 
-// astEnvAssignment
+// astVarAssignment
 //
-type astEnvAssignment struct {
+type astVarAssignment struct {
 	name  string
 	value *astValue
 }
 
-func (a *astEnvAssignment) Apply(r *runfile) {
-	r.env[a.name] = a.value.Apply(r)
+func (a *astVarAssignment) Apply(r *runfile) {
+	r.vars[a.name] = a.value.Apply(r)
 }
 
-// astEnvQAssignment
+// astVarQAssignment
 //
-type astEnvQAssignment struct {
+type astVarQAssignment struct {
 	name  string
 	value *astValue
 }
 
-func (a *astEnvQAssignment) Apply(r *runfile) {
+func (a *astVarQAssignment) Apply(r *runfile) {
 	// Only assign if not already present+non-empty
 	//
-	if val, ok := r.env[a.name]; !ok || len(val) == 0 {
+	if val, ok := r.vars[a.name]; !ok || len(val) == 0 {
 		if val, ok = os.LookupEnv(a.name); !ok || len(val) == 0 {
-			r.env[a.name] = a.value.Apply(r)
+			r.vars[a.name] = a.value.Apply(r)
 		}
 	}
 }
@@ -184,17 +315,17 @@ func (a *astEnvQAssignment) Apply(r *runfile) {
 // astValueRunes
 //
 type astValueRunes struct {
-	runes string
+	value string
 }
 
 // newAstValueRunes
 //
-func newAstValueRunes(runes string) *astValueRunes {
-	return &astValueRunes{runes: runes}
+func newAstValueRunes(value string) *astValueRunes {
+	return &astValueRunes{value: value}
 }
 
 func (a *astValueRunes) Apply(r *runfile) string {
-	return a.runes
+	return a.value
 }
 
 // astValueEsc
@@ -210,17 +341,17 @@ func (a *astValueEsc) Apply(r *runfile) string {
 // astValueVar
 //
 type astValueVar struct {
-	varName string
+	name string
 }
 
 func (a *astValueVar) Apply(r *runfile) string {
-	if val, ok := r.env[a.varName]; ok {
+	if val, ok := r.vars[a.name]; ok {
 		return val
 	}
-	if val, ok := os.LookupEnv(a.varName); ok {
+	if val, ok := os.LookupEnv(a.name); ok {
 		return val
 	}
-	if val, ok := r.attrs[a.varName]; ok {
+	if val, ok := r.attrs[a.name]; ok {
 		return val
 	}
 	return ""
@@ -234,11 +365,19 @@ type astValueShell struct {
 
 func (a *astValueShell) Apply(r *runfile) string {
 	cmd := a.cmd.Apply(r)
-	b := &strings.Builder{}
-	executeSubCommand(r.attrs[".SHELL"], cmd, r.env, b)
-	result := b.String()
+	env := make(map[string]string)
+	for _, name := range r.exports {
+		if value, ok := r.vars[name]; ok {
+			env[name] = value
+		} else {
+			log.Println("Warning: exported variable not defined: ", name)
+		}
+	}
+	capturedOutput := &strings.Builder{}
+	executeSubCommand(r.attrs[".SHELL"], cmd, env, capturedOutput)
+	result := capturedOutput.String()
 
-	// Trim trailing newlines
+	// Trim trailing newlines, per std command-substitution behavior
 	//
 	for result[len(result)-1] == '\n' {
 		result = result[0 : len(result)-1]

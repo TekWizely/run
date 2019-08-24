@@ -78,11 +78,11 @@ func ignoreEmptyLines(l *lexer.Lexer) {
 	}
 }
 
-// matchLeadingSpace
-//
-func matchLeadingSpace(l *lexer.Lexer) bool {
-	return matchOneOrMore(l, isSpaceOrTab)
-}
+// // matchLeadingSpace
+// //
+// func matchLeadingSpace(l *lexer.Lexer) bool {
+// 	return matchOneOrMore(l, isSpaceOrTab)
+// }
 
 // ignoreLeadingSpace
 //

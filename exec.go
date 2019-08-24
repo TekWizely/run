@@ -63,6 +63,8 @@ func executeScript(shell string, script []string, args []string, env map[string]
 	cmd.Stdout = out
 	cmd.Stderr = os.Stderr
 	cmd.Env = os.Environ()
+	// Merge passed-in env with os environment
+	//
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}

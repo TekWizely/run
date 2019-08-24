@@ -69,7 +69,7 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 	case l.CanPeek(2) && l.Peek(1) == runeColon && l.Peek(2) == runeEquals:
 		l.Next() // :
 		l.Next() // =
-		l.EmitType(tokenColonEquals)
+		l.EmitType(tokenEquals)
 	// ?=
 	//
 	case l.CanPeek(2) && l.Peek(1) == runeQMark && l.Peek(2) == runeEquals:
@@ -445,6 +445,50 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
+func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreSpace(l)
+	if !matchID(l) {
+		l.EmitError("Expecting variable name")
+		return nil
+	}
+	l.EmitToken(tokenID)
+	ignoreSpace(l)
+
+	switch {
+	// ','
+	//
+	case peekRuneEquals(l, runeComma):
+		for matchRune(l, runeComma) {
+			l.EmitType(tokenComma)
+			ignoreSpace(l)
+			if !matchID(l) {
+				l.EmitError("Expecting variable name")
+				return nil
+			}
+			l.EmitToken(tokenID)
+			ignoreSpace(l)
+		}
+	// '='
+	//
+	case matchRune(l, runeEquals):
+		l.EmitType(tokenEquals)
+	// ':='
+	//
+	case matchRune(l, runeColon):
+		expectRune(l, runeEquals, "Expecting '='")
+		l.EmitType(tokenEquals)
+	// '?='
+	//
+	case matchRune(l, runeQMark):
+		expectRune(l, runeEquals, "Expecting '='")
+		l.EmitType(tokenQMarkEquals)
+	default:
+		// No default
+	}
+
+	return nil
+}
+
 // lexCmdScript
 //
 func lexCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
@@ -457,7 +501,6 @@ func lexCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
 	matchZeroOrMore(l, isSpaceOrTab)
 	matchNewlineOrEOF(l)
 	l.Clear()
-	ctx.pushFn(lexEndCmdScript)
 	return lexCmdScriptLine
 }
 

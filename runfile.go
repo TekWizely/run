@@ -3,9 +3,10 @@ package main
 // runfile
 //
 type runfile struct {
-	attrs map[string]string  // All keys uppercase. Keys include leading '.'
-	env   map[string]string  // Shell variables
-	cmds  map[string]*runCmd // key = cmd
+	attrs   map[string]string  // All keys uppercase. Keys include leading '.'
+	vars    map[string]string  // Runfile variables
+	exports []string           // Exported variables
+	cmds    map[string]*runCmd // key = cmd.name
 }
 
 func (r *runfile) HasCommand(c string) bool {
@@ -21,9 +22,10 @@ func (r *runfile) DefaultShell() (string, bool) {
 //
 func processAST(ast *ast) *runfile {
 	rf := &runfile{
-		attrs: make(map[string]string),
-		env:   make(map[string]string),
-		cmds:  make(map[string]*runCmd),
+		attrs:   map[string]string{},
+		vars:    map[string]string{},
+		exports: []string{},
+		cmds:    map[string]*runCmd{},
 	}
 	for _, node := range ast.nodes {
 		node.Apply(rf)
@@ -53,10 +55,10 @@ type runCmdConfig struct {
 // runCmd
 //
 type runCmd struct {
+	name   string
 	config *runCmdConfig
 	attrs  map[string]string
 	env    map[string]string
-	name   string
 	script []string
 }
 

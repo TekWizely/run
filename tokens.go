@@ -11,8 +11,8 @@ const (
 	tokenDotID
 
 	tokenColon
-	tokenEquals
-	tokenColonEquals // :=
+	tokenComma
+	tokenEquals      // '=' | ':='
 	tokenQMarkEquals // ?=
 
 	tokenDQuote
@@ -33,6 +33,7 @@ const (
 	tokenRParen
 	tokenSubCmdStart
 
+	tokenExport
 	tokenCommand
 
 	tokenConfigShell
@@ -43,6 +44,7 @@ const (
 	tokenConfigOptShort
 	tokenConfigOptLong
 	tokenConfigOptValue
+	tokenConfigExport
 
 	tokenConfigEnd
 

@@ -9,7 +9,7 @@ repos:
   # Built-in hooks
   # ==========================================================================
   -   repo: git://github.com/pre-commit/pre-commit-hooks
-      rev: v2.2.3
+      rev: v2.3.0
       hooks:
         -   id: check-merge-conflict
         -   id: check-yaml
@@ -54,7 +54,7 @@ repos:
     #       always_run: true        # Run even if no matching files staged
     # ==========================================================================
   -   repo: https://github.com/tekwizely/pre-commit-golang
-      rev: v0.6.1
+      rev: v0.7.3
       hooks:
         -   id: go-build-mod
             alias: build
@@ -62,10 +62,12 @@ repos:
             alias: test
         -   id: go-vet-mod
             alias: vet
-        -   id: go-fmt-fix
+        #     -   id: go-fmt
+        #     -   id: go-imports # replaces go-fmt
+        -   id: go-returns # replaces go-imports & go-fmt
             alias: fmt
-        #     -   id: go-imports-fix # replaces go-fmt-fix
-        #     -   id: go-returns-fix # replaces go-imports-fix & go-fmt-fix
+            args: [-w, --]
+
         -   id: go-lint
             alias: lint
         -   id: go-critic
@@ -77,5 +79,6 @@ repos:
         # - Supports repo config file for configuration
         # - https://github.com/golangci/golangci-lint
         #
-        -   id: golangci-lint-dir-fix
+        -   id: golangci-lint-mod
             alias: ci
+            args: ['-D=deadcode,unused', --fix, --]

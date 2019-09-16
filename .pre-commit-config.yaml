@@ -54,7 +54,7 @@ repos:
     #       always_run: true        # Run even if no matching files staged
     # ==========================================================================
   -   repo: https://github.com/tekwizely/pre-commit-golang
-      rev: v0.7.3
+      rev: v0.7.4
       hooks:
         -   id: go-build-mod
             alias: build

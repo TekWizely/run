@@ -1,6 +1,6 @@
 module github.com/tekwizely/run-cmd
 
-go 1.12
+go 1.13
 
 // To update:
 //

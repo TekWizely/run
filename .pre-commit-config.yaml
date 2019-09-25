@@ -54,7 +54,7 @@ repos:
     #       always_run: true        # Run even if no matching files staged
     # ==========================================================================
   -   repo: https://github.com/tekwizely/pre-commit-golang
-      rev: v0.7.4
+      rev: v0.8.0
       hooks:
         -   id: go-build-mod
             alias: build
@@ -66,7 +66,7 @@ repos:
         #     -   id: go-imports # replaces go-fmt
         -   id: go-returns # replaces go-imports & go-fmt
             alias: fmt
-            args: [-w, --]
+            args: [-d=false, -w]
 
         -   id: go-lint
             alias: lint
@@ -81,4 +81,4 @@ repos:
         #
         -   id: golangci-lint-mod
             alias: ci
-            args: ['-D=deadcode,unused', --fix, --]
+            args: ['-D=deadcode,unused', --fix]

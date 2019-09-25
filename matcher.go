@@ -4,6 +4,12 @@ import "github.com/tekwizely/go-parsing/lexer"
 
 type runeFn func(rune) bool
 
+// isRune accepts a rune and returns a predicate suitable for match* functions.
+//
+func isRune(r rune) runeFn {
+	return func(r_ rune) bool { return r_ == r }
+}
+
 // matchRune
 //
 func matchRune(l *lexer.Lexer, runes ...rune) bool {

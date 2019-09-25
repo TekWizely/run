@@ -11,9 +11,12 @@ import (
 
 // normalizeCmdScript
 // Removes leading and trailing lines that are empty or whitespace only.
-// Removes all leading whitepace that matches leading whitespace on first non-empty line
+// Removes all leading whitespace that matches leading whitespace on first non-empty line
 //
 func normalizeCmdScript(txt []string) []string {
+	if len(txt) == 0 {
+		return txt
+	}
 	// Remove empty leading lines
 	//
 	for isLineWhitespaceOnly(txt[0]) {
@@ -45,6 +48,25 @@ func normalizeCmdScript(txt []string) []string {
 			}
 		}
 
+	}
+	return txt
+}
+
+// normalizeCmdDesc
+// Removes leading and trailing lines that are empty or whitespace only.
+func normalizeCmdDesc(txt []string) []string {
+	if len(txt) == 0 {
+		return txt
+	}
+	// Remove empty leading lines
+	//
+	for isLineWhitespaceOnly(txt[0]) {
+		txt = txt[1:]
+	}
+	// Remove empty trailing lines
+	//
+	for isLineWhitespaceOnly(txt[len(txt)-1]) {
+		txt = txt[:len(txt)-1]
 	}
 	return txt
 }

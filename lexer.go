@@ -82,14 +82,21 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 		i := bytes.IndexRune(singleRunes, l.Peek(1))
 		l.Next()                    // Match the rune
 		l.EmitType(singleTokens[i]) // Emit just the type, discarding the matched rune
+	// HashLine - Includes trailing newline
+	//
+	case matchHashLine(l):
+		l.EmitType(tokenHashLine)
 	// Comment
 	//
 	case matchComment(l):
 		l.Clear() // Discard the comment (for now)
-	// Whitespace run
+	// Leading Whitespace
 	//
-	case matchOneOrMore(l, isSpaceOrTab) || matchNewline(l):
-		l.Clear() // Discard them all
+	case matchOneOrMore(l, isSpaceOrTab):
+		l.Clear() // Discard
+	// Newline
+	case matchNewline(l):
+		l.EmitType(tokenNewline)
 	// DotID
 	//
 	case matchDotID(l):
@@ -299,24 +306,48 @@ func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
-// lexCmdDesc
+// lexDocBlock
 //
-func lexCmdDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
-	ignoreEmptyLines(l)
-	ignoreLeadingSpace(l)
+func lexDocBlock(ctx *lexContext, l *lexer.Lexer) lexFn {
 	m := l.Marker()
-	if matchRune(l, runeHash) {
-		l.Clear() // Clear # + Leading Space
-		l.EmitType(tokenHash)
-		ignoreSpace(l)
-		matchZeroOrMore(l, isPrintNonReturn)
-		l.EmitToken(tokenRunes)
-		return lexCmdDesc
+	if matchOne(l, isHash) {
+		// 2+ # = ignored as a comment
+		//
+		if matchComment(l) {
+			l.Clear() // Discard
+		} else {
+			l.EmitType(tokenHash)
+			ignoreSpace(l)
+			matchZeroOrMore(l, isPrintNonReturn)
+			l.EmitToken(tokenRunes)
+			matchNewline(l)
+			l.Clear()
+		}
+		return lexDocBlock
 	}
 	m.Apply()
-	l.EmitType(tokenConfigDescEnd)
+	l.EmitType(tokenDocBlockEnd)
 	return nil
 }
+
+// // lexCmdDesc
+// //
+// func lexCmdDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
+// 	ignoreEmptyLines(l)
+// 	ignoreLeadingSpace(l)
+// 	m := l.Marker()
+// 	if matchOne(l, isHash) {
+// 		l.Clear() // Clear # + Leading Space
+// 		l.EmitType(tokenHash)
+// 		ignoreSpace(l)
+// 		matchZeroOrMore(l, isPrintNonReturn)
+// 		l.EmitToken(tokenRunes)
+// 		return lexCmdDesc
+// 	}
+// 	m.Apply()
+// 	l.EmitType(tokenConfigDescEnd)
+// 	return nil
+// }
 
 // lexCmdAttr
 //
@@ -324,6 +355,10 @@ func lexCmdAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 	ignoreEmptyLines(l)
 	ignoreLeadingSpace(l)
 	m := l.Marker()
+	if matchComment(l) {
+		l.Clear()
+		return lexCmdAttr
+	}
 	if matchID(l) {
 		name := strings.ToUpper(l.PeekToken())
 		if t, ok := cmdConfigTokens[name]; ok {
@@ -541,10 +576,24 @@ func lexEndCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
+// matchHashLine assumes it starts at beginning of line
+//
+func matchHashLine(l *lexer.Lexer) bool {
+	m := l.Marker()
+	if matchOne(l, isHash) &&
+		matchOneOrMore(l, isHash) &&
+		matchZeroOrMore(l, isSpaceOrTab) &&
+		matchNewlineOrEOF(l) {
+		return true
+	}
+	m.Apply()
+	return false
+}
+
 // matchComment
 //
 func matchComment(l *lexer.Lexer) bool {
-	if matchRune(l, runeHash) {
+	if matchOne(l, isHash) {
 		for !matchNewlineOrEOF(l) {
 			l.Next()
 		}

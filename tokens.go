@@ -7,7 +7,9 @@ import (
 // We define our lexer tokens starting from the pre-defined START token
 //
 const (
-	tokenID = lexer.TStart + iota
+	tokenNewline = lexer.TStart + iota
+
+	tokenID
 	tokenDotID
 
 	tokenColon
@@ -36,8 +38,11 @@ const (
 	tokenExport
 	tokenCommand
 
+	tokenHashLine
+	tokenDocBlockEnd
+
 	tokenConfigShell
-	tokenConfigDescEnd
+	// tokenConfigDescEnd
 	tokenConfigUsage
 	tokenConfigOpt
 	tokenConfigOptName

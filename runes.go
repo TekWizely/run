@@ -77,6 +77,10 @@ func isAlphaNumDotUnder(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || r == '.'
 }
 
+func isHash(r rune) bool {
+	return r == runeHash
+}
+
 func isSpaceOrTab(r rune) bool {
 	return r == runeSpace || r == runeTab
 }

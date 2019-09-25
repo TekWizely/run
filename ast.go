@@ -149,6 +149,7 @@ func (a *astCmd) Apply(r *runfile) {
 	for _, desc := range a.config.desc {
 		cmd.config.desc = append(cmd.config.desc, desc.Apply(r, cmd))
 	}
+	cmd.config.desc = normalizeCmdDesc(cmd.config.desc)
 	// Config Usages
 	//
 	for _, usage := range a.config.usages {

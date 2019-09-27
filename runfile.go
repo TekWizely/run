@@ -74,6 +74,3 @@ func (c *runCmd) Shell() string {
 func (c *runCmd) EnableHelp() bool {
 	return len(c.config.desc) > 0 || len(c.config.usages) > 0 || len(c.config.opts) > 0
 }
-func (c *runCmd) EnableUsage() bool {
-	return len(c.config.usages) > 0 || len(c.config.opts) > 0
-}

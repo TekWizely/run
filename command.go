@@ -19,12 +19,12 @@ func normalizeCmdScript(txt []string) []string {
 	}
 	// Remove empty leading lines
 	//
-	for isLineWhitespaceOnly(txt[0]) {
+	for len(txt) > 0 && isLineWhitespaceOnly(txt[0]) {
 		txt = txt[1:]
 	}
 	// Remove empty trailing lines
 	//
-	for isLineWhitespaceOnly(txt[len(txt)-1]) {
+	for len(txt) > 0 && isLineWhitespaceOnly(txt[len(txt)-1]) {
 		txt = txt[:len(txt)-1]
 	}
 	// Still have anything?
@@ -60,12 +60,12 @@ func normalizeCmdDesc(txt []string) []string {
 	}
 	// Remove empty leading lines
 	//
-	for isLineWhitespaceOnly(txt[0]) {
+	for len(txt) > 0 && isLineWhitespaceOnly(txt[0]) {
 		txt = txt[1:]
 	}
 	// Remove empty trailing lines
 	//
-	for isLineWhitespaceOnly(txt[len(txt)-1]) {
+	for len(txt) > 0 && isLineWhitespaceOnly(txt[len(txt)-1]) {
 		txt = txt[:len(txt)-1]
 	}
 	return txt
@@ -168,12 +168,15 @@ func (a *boolOpt) IsBoolFlag() bool {
 //
 func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 	flags := flag.NewFlagSet(cmd.name, flag.ExitOnError)
+	// Invoked if error parsing arguments.
+	//
 	flags.Usage = func() {
-		if cmd.EnableUsage() {
-			showCmdUsage(cmd)
-		}
+		// Show less verbose usage.
+		// User can use -h/--help for full desc+usage
+		//
+		showCmdUsage(cmd)
+		os.Exit(2)
 	}
-
 	var (
 		stringVals = make(map[string]*stringOpt)
 		boolVals   = make(map[string]*boolOpt)
@@ -181,19 +184,17 @@ func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 	// Help : -h, --help
 	//
 	help := false
-	if cmdAddHelp {
-		flags.BoolVar(&help, "h", help, "")
-		flags.BoolVar(&help, "help", help, "")
-	}
+	hasHelpShort := false
+	hasHelpLong := false
 	for _, opt := range cmd.config.opts {
-		if cmdAddHelp {
-			// 'h' != 'H'
-			if opt.short == 'h' {
-				panic(fmt.Sprintf("%s: Cannot redefine '-h'", cmd.name))
-			}
-			if strings.EqualFold(opt.long, "help") {
-				panic(fmt.Sprintf("%s: Cannot redefine '--help'", cmd.name))
-			}
+		// If explicitly added, then cannot be overridden
+		//
+		// 'h' != 'H'
+		if opt.short == 'h' {
+			hasHelpShort = true
+		}
+		if strings.EqualFold(opt.long, "help") {
+			hasHelpLong = true
 		}
 		optName := opt.name
 		var flag flagOpt
@@ -221,8 +222,18 @@ func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 			flags.Var(flag, strings.ToLower(opt.long), "")
 		}
 	}
+	if !hasHelpShort {
+		flags.BoolVar(&help, "h", help, "")
+	}
+	if !hasHelpLong {
+		flags.BoolVar(&help, "help", help, "")
+	}
 	_ = flags.Parse(args)
-	if cmdAddHelp && help {
+	// User explicitly asked for help
+	//
+	if help {
+		// Show full help details
+		//
 		showCmdHelp(cmd)
 		os.Exit(2)
 	}
@@ -238,46 +249,69 @@ func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 // showCmdHelp shows cmd, desc, usage and opts
 //
 func showCmdHelp(cmd *runCmd) {
-	if cmd.EnableHelp() {
-		fmt.Fprintf(errOut, "%s (%s):\n", cmd.name, cmd.Shell())
-		// Desc
-		//
-		if len(cmd.config.desc) > 0 {
-			for _, desc := range cmd.config.desc {
-				fmt.Fprintf(errOut, "  %s\n", desc)
-			}
-			// } else {
-			// 	fmt.Fprintf(errOut, "%s:\n", cmd.name)
-		}
-		showCmdUsage(cmd)
-	} else {
+	if !cmd.EnableHelp() {
 		fmt.Fprintf(errOut, "%s (%s): No help available.\n", cmd.name, cmd.Shell())
+		return
 	}
+	fmt.Fprintf(errOut, "%s (%s):\n", cmd.name, cmd.Shell())
+	// Desc
+	//
+	if len(cmd.config.desc) > 0 {
+		for _, desc := range cmd.config.desc {
+			fmt.Fprintf(errOut, "  %s\n", desc)
+		}
+		// } else {
+		// 	fmt.Fprintf(errOut, "%s:\n", cmd.name)
+	}
+	showCmdUsage(cmd)
 }
 
 // showCmdUsage show only usage + opts
 //
 func showCmdUsage(cmd *runCmd) {
+	if !cmd.EnableHelp() {
+		fmt.Fprintf(errOut, "%s (%s): No help available.\n", cmd.name, cmd.Shell())
+		return
+	}
 	// Usages
 	//
 	for i, usage := range cmd.config.usages {
+		or := "or"
 		if i == 0 {
 			fmt.Fprintf(errOut, "Usage:\n")
+			or = "  " // 2 spaces
 		}
 		pad := strings.Repeat(" ", len(cmd.name)-1)
 		if usage[0] == '(' {
 			fmt.Fprintf(errOut, "       %s %s\n", pad, usage)
 		} else {
-			fmt.Fprintf(errOut, "  or   %s %s\n", cmd.name, usage)
+			fmt.Fprintf(errOut, "  %s   %s %s\n", or, cmd.name, usage)
+		}
+	}
+	hasHelpShort := false
+	hasHelpLong := false
+	for _, opt := range cmd.config.opts {
+		if opt.short == 'h' {
+			hasHelpShort = true
+		}
+		if opt.long == "help" {
+			hasHelpLong = true
 		}
 	}
 	// Options
 	//
-	if len(cmd.config.opts) > 0 || cmdAddHelp {
+	if len(cmd.config.opts) > 0 {
 		fmt.Fprintln(errOut, "Options:")
-		if cmdAddHelp {
-			fmt.Fprintln(errOut, "  -h, --help")
-			fmt.Fprintln(errOut, "  \tShow full help screen")
+		if !hasHelpShort || !hasHelpLong {
+			switch {
+			case !hasHelpShort && hasHelpLong:
+				fmt.Fprintln(errOut, "  -h")
+			case hasHelpShort && !hasHelpLong:
+				fmt.Fprintln(errOut, "  --help")
+			default:
+				fmt.Fprintln(errOut, "  -h, --help")
+			}
+			fmt.Fprintln(errOut, "        Show full help screen")
 		}
 	}
 	for _, opt := range cmd.config.opts {
@@ -343,14 +377,14 @@ func runHelp(_ *runfile) {
 		cmdName = os.Args[0]
 		os.Args = os.Args[1:]
 	}
+	cmdName = strings.ToLower(cmdName)
 	if c, ok := commandMap[cmdName]; ok {
 		c.help()
 	} else {
 		log.Printf("command not found: %s", cmdName)
 		listCommands()
-		os.Exit(2)
 	}
-
+	os.Exit(2)
 }
 
 // runCommand

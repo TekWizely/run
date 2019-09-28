@@ -525,12 +525,11 @@ func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
 }
 
 // lexCmdScript
+// Presumed to start immediately after '{'
+// Consumes remainder of '{' line, so that cmdScriptLine loop always enters
+// at the beginning of a line
 //
 func lexCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
-	// Open Brace
-	//
-	expectRune(l, runeLBrace, "expecting '{'")
-	l.EmitType(tokenLBrace)
 	// Discard whitespace to EOL
 	//
 	matchZeroOrMore(l, isSpaceOrTab)

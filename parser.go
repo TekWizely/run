@@ -216,7 +216,13 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, docBlock []*astCmdValue) b
 	ctx.pushLexFn(ctx.l.fn)
 	// Config
 	//
-	config := expectCmdConfig(ctx, p)
+	var config *astCmdConfig
+	if tryPeekType(p, tokenColon) {
+		p.Next() // Consume ':'
+		config = expectCmdConfig(ctx, p)
+	} else {
+		config = &astCmdConfig{}
+	}
 	if docBlock != nil {
 		config.desc = docBlock
 	}
@@ -307,6 +313,8 @@ func tryMatchAssignmentValue(ctx *parseContext, p *parser.Parser) (*astValue, bo
 	}
 }
 
+// tryMatchDollarString
+//
 func tryMatchDollarString(ctx *parseContext, p *parser.Parser) (*astValue, bool) {
 	ctx.setLexFn(lexDollarString)
 	if !p.CanPeek(1) {
@@ -326,6 +334,8 @@ func tryMatchDollarString(ctx *parseContext, p *parser.Parser) (*astValue, bool)
 	return newAstValue([]astValueElement{}), false
 }
 
+// expectVarRef
+//
 func expectVarRef(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexVarRef)
 	// Dollar
@@ -344,6 +354,8 @@ func expectVarRef(ctx *parseContext, p *parser.Parser) *astValue {
 	return newAstValue([]astValueElement{&astValueVar{name: value}})
 }
 
+// expectSubCmd
+//
 func expectSubCmd(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexSubCmd)
 	// Dollar
@@ -377,6 +389,8 @@ func expectSubCmd(ctx *parseContext, p *parser.Parser) *astValue {
 	panic("expecting tokenRParen (')')")
 }
 
+// expectSQString
+//
 func expectSQString(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexSQString)
 	// Open Quote
@@ -392,6 +406,8 @@ func expectSQString(ctx *parseContext, p *parser.Parser) *astValue {
 	return newAstValue([]astValueElement{&astValueRunes{value: value}})
 }
 
+// expectDQString
+//
 func expectDQString(ctx *parseContext, p *parser.Parser) *astValue {
 	ctx.setLexFn(lexDQString)
 	// Open Quote
@@ -431,30 +447,39 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *astValue {
 	panic("expecting tokenDoubleQuote ('\"')")
 }
 
-// tryMatchCmdHeaderWithShell matches [ ID ( '(' ID ')' )? ':' ]
+// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
 func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
-	if p.CanPeek(3) &&
-		p.PeekType(1) == tokenCommand &&
-		p.PeekType(2) == tokenID &&
-		(p.PeekType(3) == tokenColon || p.PeekType(3) == tokenLParen) {
+	expectCommand := tryPeekType(p, tokenCommand)
+	if expectCommand {
 		expectTokenType(p, tokenCommand, "Expecting tokenCommand")
-		// Grab the name
-		//
-		name := p.Next().Value()
-		// Is Shell present?
-		//
-		var shell string
-		if tryPeekType(p, tokenLParen) {
-			expectTokenType(p, tokenLParen, "Expecting tokenLParen ('(')")
-			shell = expectTokenType(p, tokenID, "Expecting tokenID").Value()
-			expectTokenType(p, tokenRParen, "Expecting tokenRParen (')')")
-		}
-		expectTokenType(p, tokenColon, "Expecting tokenColon (':')")
-		p.Clear()
-		return name, shell, true
+	} else {
+		expectCommand =
+			tryPeekTypes(p, tokenID, tokenColon) ||
+				tryPeekTypes(p, tokenID, tokenLParen) ||
+				tryPeekTypes(p, tokenID, tokenLBrace)
 	}
-	return "", "", false
+	if !expectCommand {
+		return "", "", false
+	}
+	// Name
+	//
+	name := expectTokenType(p, tokenID, "Expecting tokenId").Value()
+	// Shell
+	//
+	shell := ""
+	if tryPeekType(p, tokenLParen) {
+		expectTokenType(p, tokenLParen, "Expecting tokenLParen ('(')")
+		shell = expectTokenType(p, tokenID, "Expecting shell name").Value()
+		expectTokenType(p, tokenRParen, "Expecting tokenRParen (')')")
+	}
+	// Colon or Brace - If not present,then error, but don't consume if pesent
+	//
+	if !tryPeekType(p, tokenColon) && !tryPeekType(p, tokenLBrace) {
+		panic(parseError(p, "Expecting tokenColon (':') or tokenLBrace ('{')"))
+	}
+	p.Clear()
+	return name, shell, true
 }
 
 // expectCmdConfig
@@ -570,10 +595,9 @@ func expectCmdConfig(ctx *parseContext, p *parser.Parser) *astCmdConfig {
 // expectCmdScript
 //
 func expectCmdScript(ctx *parseContext, p *parser.Parser) []string {
-	ctx.setLexFn(lexCmdScript)
-	// Open Brace
-	//
+	ctx.setLexFn(lexMain)
 	expectTokenType(p, tokenLBrace, "expecting tokenLBrace ('{')")
+	ctx.setLexFn(lexCmdScript)
 	// Script Body
 	//
 	var scriptText []string
@@ -587,16 +611,40 @@ func expectCmdScript(ctx *parseContext, p *parser.Parser) []string {
 	return scriptText
 }
 
+// tryPeekType
+//
 func tryPeekType(p *parser.Parser, typ token.Type) bool {
 	return p.CanPeek(1) && p.PeekType(1) == typ
 }
 
-func expectTokenType(p *parser.Parser, typ token.Type, msg string) token.Token {
-	if p.CanPeek(1) {
-		if t := p.Peek(1); t.Type() != typ {
-			panic(fmt.Sprintf("%d.%d: %s", t.Line(), t.Column(), msg))
+// tryPeekTypes
+//
+func tryPeekTypes(p *parser.Parser, types ...token.Type) bool {
+	for i, typ := range types {
+		if !p.CanPeek(i+1) || p.PeekType(i+1) != typ {
+			return false
 		}
+	}
+	return true
+}
+
+// expectTokenType
+//
+func expectTokenType(p *parser.Parser, typ token.Type, msg string) token.Token {
+	if p.CanPeek(1) && p.Peek(1).Type() == typ {
 		return p.Next()
 	}
-	panic(fmt.Sprintf("<eof>: %s", msg))
+	panic(parseError(p, msg))
+}
+
+// parseError
+//
+func parseError(p *parser.Parser, msg string) error {
+	// If a token is available, use it for line/column
+	//
+	if p.CanPeek(1) {
+		t := p.Peek(1)
+		return fmt.Errorf("%d.%d: %s", t.Line(), t.Column(), msg)
+	}
+	return fmt.Errorf("<eof>: %s", msg)
 }

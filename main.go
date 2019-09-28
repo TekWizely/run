@@ -138,7 +138,7 @@ func main() {
 	commandMap["list"] = listCmd
 	commandMap["help"] = helpCmd
 	commandList = append(commandList, listCmd, helpCmd)
-	rfCmdIndex := len(commandList)
+	builtinCnt := len(commandList)
 	for name, rfcmd := range rf.cmds {
 		name = strings.ToLower(name) // normalize
 		if _, ok := commandMap[name]; ok {
@@ -154,11 +154,11 @@ func main() {
 		commandMap[name] = cmd
 		commandList = append(commandList, cmd)
 	}
-	// In shebang mode, if only 1 command defined, named "main", default to it directly
+	// In shebang mode, if only 1 runfile command defined, named "main", default to it directly
 	//
 	mainMode = shebangMode &&
-		len(commandList) == (rfCmdIndex+1) &&
-		strings.EqualFold(commandList[rfCmdIndex].name, "main")
+		len(commandList) == (builtinCnt+1) &&
+		strings.EqualFold(commandList[builtinCnt].name, "main")
 	// Determine which command to run
 	//
 	var cmdName string
@@ -167,7 +167,7 @@ func main() {
 		//
 		os.Args = os.Args[1:] // Discard 'me'
 		cmdName = "main"
-		commandList[rfCmdIndex].rename(me) // Print help as script name
+		commandList[builtinCnt].rename(me) // Print help as script name
 	} else {
 		// If we deferred parsing args, now is the time
 		//

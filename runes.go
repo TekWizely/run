@@ -12,10 +12,11 @@ import (
 // Runes
 //
 const (
-	runeSpace     = ' '
-	runeTab       = '\t'
-	runeNewline   = '\n'
-	runeReturn    = '\r'
+	runeSpace = ' '
+	runeTab   = '\t'
+	// NOTE: You probably want matchNewline()
+	// runeNewline = '\n'
+	// runeReturn    = '\r'
 	runeHash      = '#'
 	runeDollar    = '$'
 	runeDot       = '.'
@@ -50,7 +51,7 @@ var mainTokens = map[string]token.Type{
 // Cmd Config Tokens
 //
 var cmdConfigTokens = map[string]token.Type{
-	// "SHELL":tokenConfigShell,
+	"SHELL":  tokenConfigShell,
 	"USAGE":  tokenConfigUsage,
 	"OPTION": tokenConfigOpt,
 	"OPT":    tokenConfigOpt,

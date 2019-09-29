@@ -306,9 +306,9 @@ func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
-// lexDocBlock
+// lexDocBlockDesc
 //
-func lexDocBlock(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 	m := l.Marker()
 	if matchOne(l, isHash) {
 		// 2+ # = ignored as a comment
@@ -318,54 +318,58 @@ func lexDocBlock(ctx *lexContext, l *lexer.Lexer) lexFn {
 		} else {
 			l.EmitType(tokenHash)
 			ignoreSpace(l)
+			// Possible attribute
+			//
+			if matchID(l) {
+				id := strings.ToUpper(l.PeekToken())
+				if t, ok := cmdConfigTokens[id]; ok {
+					l.Clear()
+					l.EmitToken(tokenRunes)
+					l.EmitType(tokenConfigDescEnd)
+					l.EmitType(t)
+					return nil
+				}
+			}
 			matchZeroOrMore(l, isPrintNonReturn)
 			l.EmitToken(tokenRunes)
 			matchNewline(l)
 			l.Clear()
 		}
-		return lexDocBlock
+		return lexDocBlockDesc
 	}
 	m.Apply()
-	l.EmitType(tokenDocBlockEnd)
+	l.EmitType(tokenConfigDescEnd)
 	return nil
 }
 
-// // lexCmdDesc
-// //
-// func lexCmdDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
-// 	ignoreEmptyLines(l)
-// 	ignoreLeadingSpace(l)
-// 	m := l.Marker()
-// 	if matchOne(l, isHash) {
-// 		l.Clear() // Clear # + Leading Space
-// 		l.EmitType(tokenHash)
-// 		ignoreSpace(l)
-// 		matchZeroOrMore(l, isPrintNonReturn)
-// 		l.EmitToken(tokenRunes)
-// 		return lexCmdDesc
-// 	}
-// 	m.Apply()
-// 	l.EmitType(tokenConfigDescEnd)
-// 	return nil
-// }
-
-// lexCmdAttr
+// lexDocBlockAttr
 //
-func lexCmdAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
-	ignoreEmptyLines(l)
-	ignoreLeadingSpace(l)
+func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 	m := l.Marker()
-	if matchComment(l) {
-		l.Clear()
-		return lexCmdAttr
-	}
-	if matchID(l) {
-		name := strings.ToUpper(l.PeekToken())
-		if t, ok := cmdConfigTokens[name]; ok {
-			l.EmitType(t)
-			return lexCmdAttr
+	if matchOne(l, isHash) {
+		// 2+ # = ignored as a comment
+		//
+		if matchComment(l) {
+			l.Clear() // Discard
+			return lexDocBlockAttr
 		}
-		l.EmitErrorf("Unrecognized command attribute: %s", name)
+		ignoreSpace(l) // Clears hash too
+		// Ignore whitespace-only comment
+		//
+		if matchNewlineOrEOF(l) {
+			l.Clear() // Discard
+			return lexDocBlockAttr
+		}
+		if matchID(l) {
+			name := strings.ToUpper(l.PeekToken())
+			if t, ok := cmdConfigTokens[name]; ok {
+				l.EmitType(t)
+				return lexDocBlockAttr
+			}
+			l.EmitErrorf("Unrecognized command attribute: %s", name)
+			return nil
+		}
+		l.EmitError("Expecting command attribute")
 		return nil
 	}
 	m.Apply()
@@ -380,6 +384,8 @@ func lexCmdShell(ctx *lexContext, l *lexer.Lexer) lexFn {
 	if matchID(l) {
 		l.EmitToken(tokenID)
 	}
+	ignoreSpace(l)
+	ignoreEOL(l)
 	return nil
 }
 
@@ -389,6 +395,8 @@ func lexCmdUsage(ctx *lexContext, l *lexer.Lexer) lexFn {
 	ignoreSpace(l)
 	matchZeroOrMore(l, isPrintNonReturn)
 	l.EmitToken(tokenRunes)
+	ignoreSpace(l)
+	ignoreEOL(l)
 	return nil
 }
 
@@ -476,7 +484,13 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 	if r, ok := tryPeekRune(l); ok && r == runeDQuote {
 		l.EmitType(tokenDQStringStart)
 	}
+	return nil
+}
 
+func lexCmdOptEnd(ctx *lexContext, l *lexer.Lexer) lexFn {
+	ignoreSpace(l)
+	ignoreEOL(l)
+	l.EmitType(tokenConfigOptEnd)
 	return nil
 }
 
@@ -521,6 +535,8 @@ func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
 		// No default
 	}
 
+	ignoreSpace(l)
+	ignoreEOL(l)
 	return nil
 }
 
@@ -606,11 +622,11 @@ func matchComment(l *lexer.Lexer) bool {
 // TODO Not sure we need [ '\r' | '\r\n' ] check since this generally a linux tool
 //
 func matchNewline(l *lexer.Lexer) bool {
-	if matchRune(l, runeNewline) {
+	if matchRune(l, '\n') {
 		return true
 	}
-	if matchRune(l, runeReturn) {
-		matchRuneOrNone(l, runeNewline)
+	if matchRune(l, '\r') {
+		matchRuneOrNone(l, '\n')
 		return true
 	}
 	return false

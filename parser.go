@@ -84,6 +84,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	var (
 		name      string
 		valueList *astValue
+		config    *astCmdConfig
 		ok        bool
 	)
 	// Newline
@@ -138,22 +139,10 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	}
 	// Doc Block
 	//
-	if tryPeekType(p, tokenHashLine) {
-		p.Next()
-		var docBlock []*astCmdValue
-		ctx.pushLexFn(ctx.l.fn)
-		ctx.setLexFn(lexDocBlock)
-		for !tryPeekType(p, tokenDocBlockEnd) {
-			expectTokenType(p, tokenHash, "Expecting tokenHash ('#')")
-			line := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
-			docBlock = append(docBlock, newAstCmdAstValue1(newAstValueRunes(line.Value())))
-			p.Clear()
-		}
-		p.Next()
-		p.Clear()
+	if config, ok = tryMatchDocBlock(ctx, p); ok {
 		// Command?
 		//
-		tryMatchCmd(ctx, p, docBlock)
+		tryMatchCmd(ctx, p, config)
 		return parseMain
 	}
 	// DotAssignment
@@ -204,27 +193,27 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 
 // tryMatchCmd
 //
-func tryMatchCmd(ctx *parseContext, p *parser.Parser, docBlock []*astCmdValue) bool {
+func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *astCmdConfig) bool {
 	var (
 		name  string
 		shell string
 		ok    bool
 	)
+	if config == nil {
+		config = &astCmdConfig{}
+	}
+
 	if name, shell, ok = tryMatchCmdHeaderWithShell(p); !ok {
 		return false
 	}
 	ctx.pushLexFn(ctx.l.fn)
 	// Config
 	//
-	var config *astCmdConfig
 	if tryPeekType(p, tokenColon) {
-		p.Next() // Consume ':'
-		config = expectCmdConfig(ctx, p)
-	} else {
-		config = &astCmdConfig{}
-	}
-	if docBlock != nil {
-		config.desc = docBlock
+		p.Next()
+		if tryPeekType(p, tokenNewline) {
+			p.Next()
+		}
 	}
 	if len(shell) > 0 {
 		if len(config.shell) > 0 && shell != config.shell {
@@ -240,6 +229,115 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, docBlock []*astCmdValue) b
 	script = normalizeCmdScript(script)
 	ctx.ast.add(&astCmd{name: name, config: config, script: script})
 	return true
+}
+
+// tryMatchDocBlock
+//
+func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*astCmdConfig, bool) {
+	var config *astCmdConfig = nil
+	if tryPeekType(p, tokenHashLine) {
+		p.Next()
+		config = &astCmdConfig{}
+		ctx.pushLexFn(ctx.l.fn)
+		ctx.setLexFn(lexDocBlockDesc)
+		// Desc
+		//
+		for !tryPeekType(p, tokenConfigDescEnd) {
+			expectTokenType(p, tokenHash, "Expecting tokenHash ('#')")
+			line := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
+			config.desc = append(config.desc, newAstCmdAstValue1(newAstValueRunes(line.Value())))
+			p.Clear()
+		}
+		expectTokenType(p, tokenConfigDescEnd, "Expecting tokenConfigDescEnd")
+		// Attributes
+		//
+		ctx.setLexFn(lexDocBlockAttr)
+		for !tryPeekType(p, tokenConfigEnd) {
+			t := p.Peek(1)
+			switch t.Type() {
+			case tokenConfigShell:
+				p.Next()
+				if config.shell != "" {
+					panic(fmt.Sprintf("%d:%d: SHELL already defined", t.Line(), t.Column()))
+				}
+				ctx.pushLexFn(ctx.l.fn)
+				ctx.setLexFn(lexCmdShell)
+				shell := expectTokenType(p, tokenID, "Expecting tokenID")
+				config.shell = shell.Value()
+			case tokenConfigUsage:
+				p.Next()
+				ctx.pushLexFn(ctx.l.fn)
+				ctx.setLexFn(lexCmdUsage)
+				usage := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
+				config.usages = append(config.usages, newAstCmdAstValue1(newAstValueRunes(usage.Value())))
+			case tokenConfigOpt:
+				p.Next()
+				opt := &astCmdOpt{}
+				ctx.pushLexFn(ctx.l.fn)
+				ctx.setLexFn(lexCmdOpt)
+				opt.name = expectTokenType(p, tokenConfigOptName, "Expecting tokenConfigOptName").Value()
+				if tryPeekType(p, tokenConfigOptShort) {
+					opt.short = []rune(p.Next().Value())[0]
+				}
+				if tryPeekType(p, tokenConfigOptLong) {
+					opt.long = p.Next().Value()
+				}
+				if tryPeekType(p, tokenConfigOptValue) {
+					opt.value = p.Next().Value()
+				}
+				if tryPeekType(p, tokenDQStringStart) {
+					p.Next()
+					opt.desc = expectDQString(ctx, p)
+				}
+				ctx.setLexFn(lexCmdOptEnd)
+				expectTokenType(p, tokenConfigOptEnd, "expecting end of line")
+				config.opts = append(config.opts, opt)
+			case tokenConfigExport:
+				p.Next()
+				ctx.pushLexFn(ctx.l.fn)
+				ctx.setLexFn(lexExport)
+				name := expectTokenType(p, tokenID, "Expecting tokenID")
+				switch {
+				// '=' | ':=''
+				//
+				case tryPeekType(p, tokenEquals):
+					p.Next()
+					// ctx.pushLexFn(ctx.l.fn)
+					if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
+						config.env = append(config.env, &astCmdEnvAssignment{name: name.Value(), value: valueList})
+					} else {
+						panic("expecting assignment value")
+					}
+				// '?='
+				//
+				case tryPeekType(p, tokenQMarkEquals):
+					p.Next()
+					// ctx.pushLexFn(ctx.l.fn)
+					if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
+						config.env = append(config.env, &astCmdEnvQAssignment{name: name.Value(), value: valueList})
+					} else {
+						panic("expecting assignment value")
+					}
+				// ','
+				//
+				default:
+					export := &astCmdExport{}
+					export.names = append(export.names, name.Value())
+					for tryPeekType(p, tokenComma) {
+						p.Next()
+						name = expectTokenType(p, tokenID, "Expecting tokenID")
+						export.names = append(export.names, name.Value())
+					}
+					config.exports = append(config.exports, export)
+				}
+			default:
+				panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
+			}
+		}
+		expectTokenType(p, tokenConfigEnd, "Expecting tokenConfigEnd")
+		p.Clear()
+	}
+	return config, config != nil
 }
 
 // tryMatchDotAssignmentStart
@@ -480,116 +578,6 @@ func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
 	}
 	p.Clear()
 	return name, shell, true
-}
-
-// expectCmdConfig
-//
-func expectCmdConfig(ctx *parseContext, p *parser.Parser) *astCmdConfig {
-	config := &astCmdConfig{}
-	// // Desc is always first, if present
-	// //
-	// ctx.setLexFn(lexCmdDesc)
-	// for !tryPeekType(p, tokenConfigDescEnd) {
-	// 	expectTokenType(p, tokenHash, "Expecting tokenHash ('#')")
-	// 	desc := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
-	// 	config.desc = append(config.desc, newAstCmdAstValue1(newAstValueRunes(desc.Value())))
-	// 	p.Clear()
-	// }
-	// expectTokenType(p, tokenConfigDescEnd, "Expecting tokenConfigDescEnd")
-
-	ctx.setLexFn(lexCmdAttr)
-	for !tryPeekType(p, tokenConfigEnd) {
-		t := p.Peek(1)
-		switch t.Type() {
-		case tokenConfigShell:
-			p.Next()
-			if config.shell != "" {
-				panic(fmt.Sprintf("%d:%d: SHELL already defined", t.Line(), t.Column()))
-			}
-			ctx.pushLexFn(ctx.l.fn)
-			ctx.setLexFn(lexCmdShell)
-			shell := expectTokenType(p, tokenID, "Expecting tokenID")
-			config.shell = shell.Value()
-		// case tokenConfigDesc:
-		// 	p.Next()
-		// 	if len(config.desc) > 0 {
-		// 		panic(fmt.Sprintf("%d:%d: DESC already defined", t.Line(), t.Column()))
-		// 	}
-		// 	ctx.pushLexFn(ctx.l.fn)
-		// 	ctx.setLexFn(lexCmdDesc)
-		// 	desc := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
-		// 	config.desc = desc.Value()
-		case tokenConfigUsage:
-			p.Next()
-			ctx.pushLexFn(ctx.l.fn)
-			ctx.setLexFn(lexCmdUsage)
-			usage := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
-			config.usages = append(config.usages, newAstCmdAstValue1(newAstValueRunes(usage.Value())))
-		case tokenConfigOpt:
-			p.Next()
-			opt := &astCmdOpt{}
-			ctx.pushLexFn(ctx.l.fn)
-			ctx.setLexFn(lexCmdOpt)
-			opt.name = expectTokenType(p, tokenConfigOptName, "Expecting tokenConfigOptName").Value()
-			if tryPeekType(p, tokenConfigOptShort) {
-				opt.short = []rune(p.Next().Value())[0]
-			}
-			if tryPeekType(p, tokenConfigOptLong) {
-				opt.long = p.Next().Value()
-			}
-			if tryPeekType(p, tokenConfigOptValue) {
-				opt.value = p.Next().Value()
-			}
-			if tryPeekType(p, tokenDQStringStart) {
-				p.Next()
-				opt.desc = expectDQString(ctx, p)
-			}
-			config.opts = append(config.opts, opt)
-		case tokenConfigExport:
-			p.Next()
-			ctx.pushLexFn(ctx.l.fn)
-			ctx.setLexFn(lexExport)
-			name := expectTokenType(p, tokenID, "Expecting tokenID")
-			switch {
-			// '=' | ':=''
-			//
-			case tryPeekType(p, tokenEquals):
-				p.Next()
-				// ctx.pushLexFn(ctx.l.fn)
-				if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
-					config.env = append(config.env, &astCmdEnvAssignment{name: name.Value(), value: valueList})
-				} else {
-					panic("expecting assignment value")
-				}
-			// '?='
-			//
-			case tryPeekType(p, tokenQMarkEquals):
-				p.Next()
-				// ctx.pushLexFn(ctx.l.fn)
-				if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
-					config.env = append(config.env, &astCmdEnvQAssignment{name: name.Value(), value: valueList})
-				} else {
-					panic("expecting assignment value")
-				}
-			// ','
-			//
-			default:
-				export := &astCmdExport{}
-				export.names = append(export.names, name.Value())
-				for tryPeekType(p, tokenComma) {
-					p.Next()
-					name = expectTokenType(p, tokenID, "Expecting tokenID")
-					export.names = append(export.names, name.Value())
-				}
-				config.exports = append(config.exports, export)
-			}
-		default:
-			panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
-		}
-	}
-	expectTokenType(p, tokenConfigEnd, "Expecting tokenConfigEnd")
-	p.Clear()
-	return config
 }
 
 // expectCmdScript

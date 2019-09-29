@@ -39,16 +39,16 @@ const (
 	tokenCommand
 
 	tokenHashLine
-	tokenDocBlockEnd
 
 	tokenConfigShell
-	// tokenConfigDescEnd
+	tokenConfigDescEnd
 	tokenConfigUsage
 	tokenConfigOpt
 	tokenConfigOptName
 	tokenConfigOptShort
 	tokenConfigOptLong
 	tokenConfigOptValue
+	tokenConfigOptEnd
 	tokenConfigExport
 
 	tokenConfigEnd

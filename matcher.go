@@ -37,12 +37,12 @@ func matchRuneOrEOF(l *lexer.Lexer, runes ...rune) bool {
 	return !l.CanPeek(1) || matchRune(l, runes...)
 }
 
-// func matchZeroOrOne(l *lexer.Lexer, fn runeFn) bool {
-// 	if l.CanPeek(1) && fn(l.Peek(1)) {
-// 		l.Next()
-// 	}
-// 	return true
-// }
+func matchZeroOrOne(l *lexer.Lexer, fn runeFn) bool {
+	if l.CanPeek(1) && fn(l.Peek(1)) {
+		l.Next()
+	}
+	return true
+}
 func matchZeroOrMore(l *lexer.Lexer, fn runeFn) bool {
 	for l.CanPeek(1) && fn(l.Peek(1)) {
 		l.Next()
@@ -71,7 +71,8 @@ func ignoreEmptyLines(l *lexer.Lexer) {
 	for {
 		m := l.Marker()
 		matchZeroOrMore(l, isSpaceOrTab)
-		if matchRuneOrEOF(l, runeNewline) {
+
+		if matchNewlineOrEOF(l) {
 			if len(l.PeekToken()) > 0 {
 				l.Clear()
 			} else {
@@ -84,22 +85,18 @@ func ignoreEmptyLines(l *lexer.Lexer) {
 	}
 }
 
-// // matchLeadingSpace
-// //
-// func matchLeadingSpace(l *lexer.Lexer) bool {
-// 	return matchOneOrMore(l, isSpaceOrTab)
-// }
-
-// ignoreLeadingSpace
-//
-func ignoreLeadingSpace(l *lexer.Lexer) {
-	matchZeroOrMore(l, isSpaceOrTab)
-	l.Clear()
-}
-
 // ignoreSpace
 //
 func ignoreSpace(l *lexer.Lexer) {
-	matchZeroOrMore(l, isSpaceOrTab)
-	l.Clear()
+	if matchOneOrMore(l, isSpaceOrTab) {
+		l.Clear()
+	}
+}
+
+// ignoreEOL
+//
+func ignoreEOL(l *lexer.Lexer) {
+	if matchNewlineOrEOF(l) {
+		l.Clear()
+	}
 }

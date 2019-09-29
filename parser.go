@@ -207,13 +207,8 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *astCmdConfig) bool
 		return false
 	}
 	ctx.pushLexFn(ctx.l.fn)
-	// Config
-	//
 	if tryPeekType(p, tokenColon) {
 		p.Next()
-		if tryPeekType(p, tokenNewline) {
-			p.Next()
-		}
 	}
 	if len(shell) > 0 {
 		if len(config.shell) > 0 && shell != config.shell {
@@ -571,7 +566,7 @@ func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
 		shell = expectTokenType(p, tokenID, "Expecting shell name").Value()
 		expectTokenType(p, tokenRParen, "Expecting tokenRParen (')')")
 	}
-	// Colon or Brace - If not present,then error, but don't consume if pesent
+	// Colon or Brace - If not present,then error, but don't consume if present
 	//
 	if !tryPeekType(p, tokenColon) && !tryPeekType(p, tokenLBrace) {
 		panic(parseError(p, "Expecting tokenColon (':') or tokenLBrace ('{')"))
@@ -583,18 +578,36 @@ func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
 // expectCmdScript
 //
 func expectCmdScript(ctx *parseContext, p *parser.Parser) []string {
+	// Open Brace
+	//
 	ctx.setLexFn(lexMain)
-	expectTokenType(p, tokenLBrace, "expecting tokenLBrace ('{')")
-	ctx.setLexFn(lexCmdScript)
+	usingBraces := tryPeekType(p, tokenLBrace)
+	if usingBraces {
+		expectTokenType(p, tokenLBrace, "expecting tokenLBrace ('{')")
+		ctx.setLexFn(lexCmdScriptAfterLBrace)
+	} else {
+		expectTokenType(p, tokenNewline, "expecting tokenNewline ('\\n')")
+		ctx.setLexFn(lexCmdScriptMaybeLBrace)
+		usingBraces = tryPeekType(p, tokenLBrace)
+		if usingBraces {
+			expectTokenType(p, tokenLBrace, "expecting tokenLBrace ('{')")
+		}
+	}
 	// Script Body
 	//
 	var scriptText []string
 	for p.CanPeek(1) && p.PeekType(1) == tokenScriptLine {
 		scriptText = append(scriptText, p.Next().Value())
 	}
+	if usingBraces || p.CanPeek(1) {
+		expectTokenType(p, tokenScriptEnd, "expecting tokenSciptEnd")
+	}
 	// Close Brace
 	//
-	expectTokenType(p, tokenRBrace, "expecting tokenRBrace ('}')")
+	if usingBraces {
+		ctx.setLexFn(lexCmdScriptMaybeRBrace)
+		expectTokenType(p, tokenRBrace, "expecting tokenRBrace ('}')")
+	}
 	p.Clear()
 	return scriptText
 }

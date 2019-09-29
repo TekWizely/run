@@ -5,8 +5,9 @@
 # Output of `go build`
 run-cmd
 
-# Testing Runfile
+# Testing Runfile(s)
 Runfile
+*.rf
 
 # ==============================================================================
 # GoLang

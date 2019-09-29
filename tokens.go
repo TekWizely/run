@@ -54,4 +54,5 @@ const (
 	tokenConfigEnd
 
 	tokenScriptLine
+	tokenScriptEnd
 )

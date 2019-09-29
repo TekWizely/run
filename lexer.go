@@ -540,12 +540,24 @@ func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
-// lexCmdScript
+// lexCmdScriptMaybeLBrace
+// If command header line ends with ':',
+// then first line of script may actually be '{'
+//
+func lexCmdScriptMaybeLBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
+	if matchRune(l, runeLBrace) {
+		l.EmitType(tokenLBrace)
+		return lexCmdScriptAfterLBrace
+	}
+	return lexCmdScriptLine
+}
+
+// lexCmdScriptAfterLBrace
 // Presumed to start immediately after '{'
 // Consumes remainder of '{' line, so that cmdScriptLine loop always enters
 // at the beginning of a line
 //
-func lexCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexCmdScriptAfterLBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
 	// Discard whitespace to EOL
 	//
 	matchZeroOrMore(l, isSpaceOrTab)
@@ -565,10 +577,13 @@ func lexCmdScriptLine(ctx *lexContext, l *lexer.Lexer) lexFn {
 		l.EmitToken(tokenScriptLine)
 		return lexCmdScriptLine
 	}
+	m := l.Marker()
 	// !whitespace at beginning of non-blank line terminates script
 	//
 	if !matchOneOrMore(l, isSpaceOrTab) {
-		return lexEndCmdScript
+		m.Apply()
+		l.EmitType(tokenScriptEnd)
+		return nil
 	}
 	// We have a script line
 	// Consume the full line, including eol/eof
@@ -580,14 +595,12 @@ func lexCmdScriptLine(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return lexCmdScriptLine
 }
 
-// lexEndCmdScript
+// lexCmdScriptMaybeRBrace
 //
-func lexEndCmdScript(ctx *lexContext, l *lexer.Lexer) lexFn {
-	expectRune(l, runeRBrace, "expecting '}'")
-	l.EmitType(tokenRBrace)
-	matchZeroOrMore(l, isSpaceOrTab)
-	matchNewlineOrEOF(l)
-	l.Clear()
+func lexCmdScriptMaybeRBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
+	if matchRune(l, runeRBrace) {
+		l.EmitType(tokenRBrace)
+	}
 	return nil
 }
 

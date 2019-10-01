@@ -41,6 +41,7 @@ const (
 	tokenHashLine
 
 	tokenConfigShell
+	tokenConfigDescLine
 	tokenConfigDescEnd
 	tokenConfigUsage
 	tokenConfigOpt

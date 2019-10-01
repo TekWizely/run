@@ -137,6 +137,16 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		p.Clear()
 		return parseMain
 	}
+	// Doc Line
+	//
+	if tryPeekType(p, tokenConfigDescLine) {
+		line := p.Next()
+		config = &astCmdConfig{}
+		config.desc = append(config.desc, newAstCmdAstValue1(newAstValueRunes(line.Value())))
+		p.Clear()
+		tryMatchCmd(ctx, p, config)
+		return parseMain
+	}
 	// Doc Block
 	//
 	if config, ok = tryMatchDocBlock(ctx, p); ok {
@@ -239,7 +249,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*astCmdConfig, bool)
 		//
 		for !tryPeekType(p, tokenConfigDescEnd) {
 			expectTokenType(p, tokenHash, "Expecting tokenHash ('#')")
-			line := expectTokenType(p, tokenRunes, "Expecting tokenRunes")
+			line := expectTokenType(p, tokenConfigDescLine, "Expecting tokenRunes")
 			config.desc = append(config.desc, newAstCmdAstValue1(newAstValueRunes(line.Value())))
 			p.Clear()
 		}

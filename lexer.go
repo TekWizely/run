@@ -82,13 +82,34 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 		i := bytes.IndexRune(singleRunes, l.Peek(1))
 		l.Next()                    // Match the rune
 		l.EmitType(singleTokens[i]) // Emit just the type, discarding the matched rune
-	// HashLine - Includes trailing newline
-	//
-	case matchHashLine(l):
-		l.EmitType(tokenHashLine)
 	// Comment
 	//
-	case matchComment(l):
+	case matchRune(l, runeHash):
+		// May be a hash-line
+		//
+		if matchOneOrMore(l, isHash) {
+			// May be a single line doc comment
+			//
+			if matchOneOrMore(l, isSpaceOrTab) {
+				l.Clear()
+				if matchOneOrMore(l, isPrintNonReturn) {
+					l.EmitToken(tokenConfigDescLine)
+					if matchNewline(l) {
+						l.Clear()
+					}
+					return lexMain
+				}
+			}
+			if matchNewlineOrEOF(l) {
+				l.EmitType(tokenHashLine)
+				return lexMain
+			}
+		}
+		// Consume rest of line as a standard comment
+		//
+		for !matchNewlineOrEOF(l) {
+			l.Next()
+		}
 		l.Clear() // Discard the comment (for now)
 	// Leading Whitespace
 	//
@@ -313,7 +334,12 @@ func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 	if matchOne(l, isHash) {
 		// 2+ # = ignored as a comment
 		//
-		if matchComment(l) {
+		if matchOne(l, isHash) {
+			// Consume rest of line, including newline
+			//
+			for !matchNewlineOrEOF(l) {
+				l.Next()
+			}
 			l.Clear() // Discard
 		} else {
 			l.EmitType(tokenHash)
@@ -324,14 +350,14 @@ func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 				id := strings.ToUpper(l.PeekToken())
 				if t, ok := cmdConfigTokens[id]; ok {
 					l.Clear()
-					l.EmitToken(tokenRunes)
+					l.EmitToken(tokenConfigDescLine)
 					l.EmitType(tokenConfigDescEnd)
 					l.EmitType(t)
 					return nil
 				}
 			}
 			matchZeroOrMore(l, isPrintNonReturn)
-			l.EmitToken(tokenRunes)
+			l.EmitToken(tokenConfigDescLine)
 			matchNewline(l)
 			l.Clear()
 		}
@@ -349,7 +375,12 @@ func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 	if matchOne(l, isHash) {
 		// 2+ # = ignored as a comment
 		//
-		if matchComment(l) {
+		if matchOne(l, isHash) {
+			// Consume rest of line, including newline
+			//
+			for !matchNewlineOrEOF(l) {
+				l.Next()
+			}
 			l.Clear() // Discard
 			return lexDocBlockAttr
 		}
@@ -602,32 +633,6 @@ func lexCmdScriptMaybeRBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
 		l.EmitType(tokenRBrace)
 	}
 	return nil
-}
-
-// matchHashLine assumes it starts at beginning of line
-//
-func matchHashLine(l *lexer.Lexer) bool {
-	m := l.Marker()
-	if matchOne(l, isHash) &&
-		matchOneOrMore(l, isHash) &&
-		matchZeroOrMore(l, isSpaceOrTab) &&
-		matchNewlineOrEOF(l) {
-		return true
-	}
-	m.Apply()
-	return false
-}
-
-// matchComment
-//
-func matchComment(l *lexer.Lexer) bool {
-	if matchOne(l, isHash) {
-		for !matchNewlineOrEOF(l) {
-			l.Next()
-		}
-		return true
-	}
-	return false
 }
 
 // matchNewline

@@ -139,8 +139,8 @@ func main() {
 	commandMap["help"] = helpCmd
 	commandList = append(commandList, listCmd, helpCmd)
 	builtinCnt := len(commandList)
-	for name, rfcmd := range rf.cmds {
-		name = strings.ToLower(name) // normalize
+	for _, rfcmd := range rf.cmds {
+		name := strings.ToLower(rfcmd.name) // normalize
 		if _, ok := commandMap[name]; ok {
 			panic("Duplicate command: " + name)
 		}

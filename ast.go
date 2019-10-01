@@ -9,24 +9,17 @@ import (
 // ast
 //
 type ast struct {
-	nodes    []astNode
-	commands map[string]struct{} // Simulate a Set
+	nodes []astNode
 }
 
 func (a *ast) add(n astNode) {
 	a.nodes = append(a.nodes, n)
-	// Command?
-	//
-	if c, ok := n.(*astCmd); ok {
-		a.commands[c.name] = struct{}{}
-	}
 }
 
 // newAST
 //
 func newAST() *ast {
 	a := &ast{}
-	a.commands = make(map[string]struct{})
 	return a
 }
 
@@ -160,7 +153,7 @@ func (a *astCmd) Apply(r *runfile) {
 	for _, opt := range a.config.opts {
 		cmd.config.opts = append(cmd.config.opts, opt.Apply(r))
 	}
-	r.cmds[cmd.name] = cmd
+	r.cmds = append(r.cmds, cmd)
 }
 
 // astCmdConfig

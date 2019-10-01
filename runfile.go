@@ -3,16 +3,12 @@ package main
 // runfile
 //
 type runfile struct {
-	attrs   map[string]string  // All keys uppercase. Keys include leading '.'
-	vars    map[string]string  // Runfile variables
-	exports []string           // Exported variables
-	cmds    map[string]*runCmd // key = cmd.name
+	attrs   map[string]string // All keys uppercase. Keys include leading '.'
+	vars    map[string]string // Runfile variables
+	exports []string          // Exported variables
+	cmds    []*runCmd
 }
 
-func (r *runfile) HasCommand(c string) bool {
-	_, ok := r.cmds[c]
-	return ok
-}
 func (r *runfile) DefaultShell() (string, bool) {
 	shell, ok := r.attrs[".SHELL"]
 	return shell, ok && len(shell) > 0
@@ -25,7 +21,7 @@ func processAST(ast *ast) *runfile {
 		attrs:   map[string]string{},
 		vars:    map[string]string{},
 		exports: []string{},
-		cmds:    map[string]*runCmd{},
+		cmds:    []*runCmd{},
 	}
 	for _, node := range ast.nodes {
 		node.Apply(rf)

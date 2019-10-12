@@ -3,7 +3,7 @@
 # ==============================================================================
 
 # Output of `go build`
-run-cmd
+run
 
 # Testing Runfile(s)
 Runfile

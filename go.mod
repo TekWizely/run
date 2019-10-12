@@ -1,4 +1,4 @@
-module github.com/tekwizely/run-cmd
+module github.com/tekwizely/run
 
 go 1.13
 

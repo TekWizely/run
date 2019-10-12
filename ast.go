@@ -6,6 +6,54 @@ import (
 	"strings"
 )
 
+type scope struct {
+	attrs   map[string]string // All keys uppercase. Keys include leading '.'
+	vars    map[string]string // Variables
+	exports []string          // Exported variables
+}
+
+func newScope() *scope {
+	return &scope{
+		attrs:   map[string]string{},
+		vars:    map[string]string{},
+		exports: []string{},
+	}
+}
+func (s *scope) GetEnv(key string) (string, bool) {
+	return os.LookupEnv(key)
+}
+
+func (s *scope) GetAttr(key string) (string, bool) {
+	val, ok := s.attrs[key]
+	return val, ok
+}
+
+func (s *scope) PutAttr(key, value string) {
+	s.attrs[key] = value
+}
+
+func (s *scope) GetVar(key string) (string, bool) {
+	val, ok := s.vars[key]
+	return val, ok
+}
+
+func (s *scope) PutVar(key, value string) {
+	s.vars[key] = value
+}
+
+func (s *scope) AddExport(key string) {
+	s.exports = append(s.exports, key)
+}
+
+func (s *scope) GetExports() []string {
+	return s.exports
+}
+
+func (s *scope) DefaultShell() (string, bool) {
+	shell, ok := s.attrs[".SHELL"]
+	return shell, ok && len(shell) > 0
+}
+
 // ast
 //
 type ast struct {
@@ -14,6 +62,10 @@ type ast struct {
 
 func (a *ast) add(n astNode) {
 	a.nodes = append(a.nodes, n)
+}
+
+func (a *ast) addScopeNode(n astScopeNode) {
+	a.nodes = append(a.nodes, &astNodeScopeNode{node: n})
 }
 
 // newAST
@@ -29,62 +81,88 @@ type astNode interface {
 	Apply(r *runfile)
 }
 
+// astScopeNode
+//
+type astScopeNode interface {
+	Apply(s *scope)
+}
+
+// astScopeValueNode
+//
+type astScopeValueNode interface {
+	Apply(s *scope) string
+}
+
 // astCmdNode
 //
 type astCmdNode interface {
 	Apply(r *runfile, c *runCmd)
 }
 
-// astValueElement
+// astNodeScopeNode
 //
-type astValueElement interface {
-	Apply(r *runfile) string
+type astNodeScopeNode struct {
+	node astScopeNode
 }
 
-// astCmdValueElement
-//
-type astCmdValueElement interface {
-	Apply(r *runfile, c *runCmd) string
+func (a *astNodeScopeNode) Apply(r *runfile) {
+	a.node.Apply(r.scope)
 }
 
-// astValue
+// astCmdNodeScopeNode
 //
-type astValue struct {
-	value []astValueElement
+type astCmdNodeScopeNode struct {
+	node astScopeNode
 }
 
-// Apply
+func (a *astCmdNodeScopeNode) Apply(r *runfile, c *runCmd) {
+	a.node.Apply(c.scope)
+}
+
+// astScopeValueNodeList
 //
-func (a *astValue) Apply(r *runfile) string {
+type astScopeValueNodeList struct {
+	values []astScopeValueNode
+}
+
+func (a *astScopeValueNodeList) Apply(s *scope) string {
 	b := &strings.Builder{}
 	if a != nil {
-		for _, v := range a.value {
-			b.WriteString(v.Apply(r))
+		for _, v := range a.values {
+			b.WriteString(v.Apply(s))
 		}
 	}
 	return b.String()
 }
 
-// newAstValue
+// newAstScopeValueNodeList
 //
-func newAstValue(value []astValueElement) *astValue {
-	return &astValue{value: value}
+func newAstScopeValueNodeList(value []astScopeValueNode) *astScopeValueNodeList {
+	return &astScopeValueNodeList{values: value}
 }
 
-// newAstValue1
+// newAstScopeValueNodeList1
 //
-func newAstValue1(value astValueElement) *astValue {
-	return &astValue{value: []astValueElement{value}}
+func newAstScopeValueNodeList1(value astScopeValueNode) *astScopeValueNodeList {
+	return &astScopeValueNodeList{values: []astScopeValueNode{value}}
 }
 
-// astExport
+// astScopeExportList
 //
-type astExport struct {
+type astScopeExportList struct {
 	names []string
 }
 
-func (a *astExport) Apply(r *runfile) {
-	r.exports = append(r.exports, a.names...)
+// newAstScopeExportList1
+//
+func newAstScopeExportList1(name string) *astScopeExportList {
+	return &astScopeExportList{[]string{name}}
+}
+
+func (a *astScopeExportList) Apply(s *scope) {
+	for _, name := range a.names {
+		s.AddExport(name)
+	}
 }
 
 // astCmd
@@ -96,42 +174,36 @@ type astCmd struct {
 }
 
 func (a *astCmd) Apply(r *runfile) {
-	cmd := &runCmd{name: a.name, script: a.script}
-	// Exports - copy vars into cmd env
-	// Setup cmd env first so its accessible from other cmd configs
-	// Copy global exports first
+	cmd := &runCmd{
+		name:   a.name,
+		scope:  newScope(),
+		script: a.script,
+	}
+	// Exports
 	//
-	cmd.env = make(map[string]string)
-	for _, name := range r.exports {
-		if value, ok := r.vars[name]; ok {
-			cmd.env[name] = value
-		} else {
-			panic("Unknown variable for export: " + name)
+	for _, name := range r.scope.exports {
+		cmd.scope.AddExport(name)
+	}
+	for _, nameList := range a.config.exports {
+		for _, name := range nameList.names {
+			cmd.scope.AddExport(name)
 		}
 	}
-	// Copy cmd exports
-	// NOTE: There could be dupes but should be safe
+	// Vars
+	// Start with copy of global vars
 	//
-	for _, exports := range a.config.exports {
-		for _, name := range exports.names {
-			if value, ok := r.vars[name]; ok {
-				cmd.env[name] = value
-			} else {
-				panic("Unknown variable for export: " + name)
-			}
-		}
+	for key, value := range r.scope.vars {
+		cmd.scope.PutVar(key, value)
 	}
 	// Config Environment
 	//
-	for _, value := range a.config.env {
-		value.Apply(r, cmd)
+	for _, varAssignment := range a.config.vars {
+		varAssignment.Apply(cmd.scope)
 	}
-
-	// attrs
+	// Attrs
 	//
-	cmd.attrs = make(map[string]string)
-	for k, v := range r.attrs {
-		cmd.attrs[k] = v
+	for k, v := range r.scope.attrs {
+		cmd.scope.PutAttr(k, v)
 	}
 	// Config
 	//
@@ -140,18 +212,18 @@ func (a *astCmd) Apply(r *runfile) {
 	// Config Desc
 	//
 	for _, desc := range a.config.desc {
-		cmd.config.desc = append(cmd.config.desc, desc.Apply(r, cmd))
+		cmd.config.desc = append(cmd.config.desc, desc.Apply(cmd.scope))
 	}
 	cmd.config.desc = normalizeCmdDesc(cmd.config.desc)
 	// Config Usages
 	//
 	for _, usage := range a.config.usages {
-		cmd.config.usages = append(cmd.config.usages, usage.Apply(r, cmd))
+		cmd.config.usages = append(cmd.config.usages, usage.Apply(cmd.scope))
 	}
 	// Config Opts
 	//
 	for _, opt := range a.config.opts {
-		cmd.config.opts = append(cmd.config.opts, opt.Apply(r))
+		cmd.config.opts = append(cmd.config.opts, opt.Apply(cmd))
 	}
 	r.cmds = append(r.cmds, cmd)
 }
@@ -160,11 +232,11 @@ func (a *astCmd) Apply(r *runfile) {
 //
 type astCmdConfig struct {
 	shell   string
-	desc    []*astCmdValue
-	usages  []*astCmdValue
+	desc    []astScopeValueNode
+	usages  []astScopeValueNode
 	opts    []*astCmdOpt
-	exports []*astCmdExport
-	env     []astCmdNode
+	vars    []astScopeNode
+	exports []*astScopeExportList
 }
 
 // astCmdOpt
@@ -174,201 +246,116 @@ type astCmdOpt struct {
 	short rune
 	long  string
 	value string
-	desc  *astValue
+	desc  astScopeValueNode
 }
 
-func (a *astCmdOpt) Apply(r *runfile) *runCmdOpt {
+func (a *astCmdOpt) Apply(c *runCmd) *runCmdOpt {
 	opt := &runCmdOpt{}
 	opt.name = a.name
 	opt.short = a.short
 	opt.long = a.long
 	opt.value = a.value
-	opt.desc = a.desc.Apply(r)
+	opt.desc = a.desc.Apply(c.scope)
 	return opt
 }
 
-// astCmdExport
+// astScopeAttrAssignment
 //
-type astCmdExport struct {
-	names []string
-}
-
-// astCmdValue
-//
-type astCmdValue struct {
-	value []astCmdValueElement
-}
-
-// Apply
-//
-func (a *astCmdValue) Apply(r *runfile, c *runCmd) string {
-	b := &strings.Builder{}
-	if a != nil {
-		for _, v := range a.value {
-			b.WriteString(v.Apply(r, c))
-		}
-	}
-	return b.String()
-}
-
-// newAstCmdValue
-//
-func newAstCmdValue(value []astCmdValueElement) *astCmdValue {
-	return &astCmdValue{value: value}
-}
-
-// newAstCmdValue1
-//
-func newAstCmdValue1(value astCmdValueElement) *astCmdValue {
-	return &astCmdValue{value: []astCmdValueElement{value}}
-}
-
-// astCmdAstValue wraps and astValue in an astCmdValue
-//
-type astCmdAstValue struct {
-	value *astValue
-}
-
-// Apply
-//
-func (a *astCmdAstValue) Apply(r *runfile, c *runCmd) string {
-	return a.value.Apply(r)
-}
-
-// newAstCmdAstValue1
-//
-func newAstCmdAstValue1(value astValueElement) *astCmdValue {
-	return &astCmdValue{value: []astCmdValueElement{&astCmdAstValue{value: newAstValue1(value)}}}
-}
-
-// astCmdEnvAssignment
-//
-type astCmdEnvAssignment struct {
+type astScopeAttrAssignment struct {
 	name  string
-	value *astValue
+	value astScopeValueNode
 }
 
-func (a *astCmdEnvAssignment) Apply(r *runfile, c *runCmd) {
-	c.env[a.name] = a.value.Apply(r)
+func (a *astScopeAttrAssignment) Apply(s *scope) {
+	s.PutAttr(a.name, a.value.Apply(s))
 }
 
-// astCmdEnvQAssignment
+// astScopeVarAssignment
 //
-type astCmdEnvQAssignment struct {
+type astScopeVarAssignment struct {
 	name  string
-	value *astValue
+	value astScopeValueNode
 }
 
-func (a *astCmdEnvQAssignment) Apply(r *runfile, c *runCmd) {
+func (a *astScopeVarAssignment) Apply(s *scope) {
+	s.PutVar(a.name, a.value.Apply(s))
+}
+
+// astScopeVarQAssignment
+//
+type astScopeVarQAssignment struct {
+	name  string
+	value astScopeValueNode
+}
+
+func (a *astScopeVarQAssignment) Apply(s *scope) {
 	// Only assign if not already present+non-empty
 	//
-	if val, ok := r.vars[a.name]; !ok || len(val) == 0 {
-		c.env[a.name] = a.value.Apply(r)
-	}
-}
-
-// astAttrAssignment
-//
-type astAttrAssignment struct {
-	name  string
-	value *astValue
-}
-
-func (a *astAttrAssignment) Apply(r *runfile) {
-	r.attrs[a.name] = a.value.Apply(r)
-}
-
-// astVarAssignment
-//
-type astVarAssignment struct {
-	name  string
-	value *astValue
-}
-
-func (a *astVarAssignment) Apply(r *runfile) {
-	r.vars[a.name] = a.value.Apply(r)
-}
-
-// astVarQAssignment
-//
-type astVarQAssignment struct {
-	name  string
-	value *astValue
-}
-
-func (a *astVarQAssignment) Apply(r *runfile) {
-	// Only assign if not already present+non-empty
-	//
-	if val, ok := r.vars[a.name]; !ok || len(val) == 0 {
-		if val, ok = os.LookupEnv(a.name); !ok || len(val) == 0 {
-			r.vars[a.name] = a.value.Apply(r)
+	if val, ok := s.GetVar(a.name); !ok || len(val) == 0 {
+		if val, ok = s.GetEnv(a.name); !ok || len(val) == 0 {
+			s.PutVar(a.name, a.value.Apply(s))
 		}
 	}
 }
 
-// astValueRunes
+// astScopeValueRunes
 //
-type astValueRunes struct {
+type astScopeValueRunes struct {
 	value string
 }
 
-// newAstValueRunes
-//
-func newAstValueRunes(value string) *astValueRunes {
-	return &astValueRunes{value: value}
-}
-
-func (a *astValueRunes) Apply(r *runfile) string {
+func (a *astScopeValueRunes) Apply(_ *scope) string {
 	return a.value
 }
 
-// astValueEsc
+// astScopeValueEsc
 //
-type astValueEsc struct {
+type astScopeValueEsc struct {
 	seq string
 }
 
-func (a *astValueEsc) Apply(r *runfile) string {
+func (a *astScopeValueEsc) Apply(_ *scope) string {
 	return string([]rune(a.seq)[1]) // TODO A bit of a hack
 }
 
-// astValueVar
+// astScopeValueVar
 //
-type astValueVar struct {
+type astScopeValueVar struct {
 	name string
 }
 
-func (a *astValueVar) Apply(r *runfile) string {
-	if val, ok := r.vars[a.name]; ok {
+func (a *astScopeValueVar) Apply(s *scope) string {
+	if val, ok := s.GetVar(a.name); ok {
 		return val
 	}
-	if val, ok := os.LookupEnv(a.name); ok {
+	if val, ok := s.GetEnv(a.name); ok {
 		return val
 	}
-	if val, ok := r.attrs[a.name]; ok {
+	if val, ok := s.GetAttr(a.name); ok {
 		return val
 	}
 	return ""
 }
 
-// astValueShell
+// astScopeValueShell
 //
-type astValueShell struct {
-	cmd *astValue
+type astScopeValueShell struct {
+	cmd astScopeValueNode
 }
 
-func (a *astValueShell) Apply(r *runfile) string {
-	cmd := a.cmd.Apply(r)
+func (a *astScopeValueShell) Apply(s *scope) string {
+	cmd := a.cmd.Apply(s)
 	env := make(map[string]string)
-	for _, name := range r.exports {
-		if value, ok := r.vars[name]; ok {
+	for _, name := range s.GetExports() {
+		if value, ok := s.GetVar(name); ok {
 			env[name] = value
 		} else {
 			log.Println("Warning: exported variable not defined: ", name)
 		}
 	}
 	capturedOutput := &strings.Builder{}
-	executeSubCommand(r.attrs[".SHELL"], cmd, env, capturedOutput)
+	shell, _ := s.GetAttr(".SHELL")
+	executeSubCommand(shell, cmd, env, capturedOutput)
 	result := capturedOutput.String()
 
 	// Trim trailing newlines, per std command-substitution behavior

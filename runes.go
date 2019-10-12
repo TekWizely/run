@@ -114,6 +114,10 @@ func isPrintNonParenNonBackslash(r rune) bool {
 	return r != runeLParen && r != runeRParen && r != runeBackSlash && unicode.IsPrint(r)
 }
 
+func isPrintNonBackslashNonDollarNonReturn(r rune) bool {
+	return r != runeBackSlash && r != runeDollar && isPrintNonReturn(r)
+}
+
 func tryPeekRune(l *lexer.Lexer) (rune, bool) {
 	if l.CanPeek(1) {
 		return l.Peek(1), true
@@ -128,18 +132,17 @@ func peekRuneEquals(l *lexer.Lexer, r rune) bool {
 func expectRune(l *lexer.Lexer, r rune, msg string) {
 	if !l.CanPeek(1) || l.Peek(1) != r {
 		l.EmitError(msg)
-		//		panic(msg)
 		return
 	}
 	l.Next()
 }
 
-// // ReaderIgnoreCR wraps a RuneReader, filtering errOut '\r'
-// // Useful for input sources that use '\r'+'\n' for end-of-line
-// //
-// func ReaderIgnoreCR(r io.RuneReader) io.RuneReader {
-// 	return &readerIgnoreCR{r: r}
-// }
+// ReaderIgnoreCR wraps a RuneReader, filtering errOut '\r'
+// Useful for input sources that use '\r'+'\n' for end-of-line
+//
+func ReaderIgnoreCR(r io.RuneReader) io.RuneReader {
+	return &readerIgnoreCR{r: r}
+}
 
 type readerIgnoreCR struct {
 	r io.RuneReader

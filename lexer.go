@@ -153,13 +153,13 @@ func lexAssignmentValue(ctx *lexContext, l *lexer.Lexer) lexFn {
 	switch l.Peek(1) {
 	// Does it look like a single-quoted string?
 	//
-	case '\'':
+	case runeSQuote:
 		l.EmitType(tokenSQStringStart)
 		return lexSQString
-	case '"':
+	case runeDQuote:
 		l.EmitType(tokenDQStringStart)
 		return lexDQString
-	case '$':
+	case runeDollar:
 		return lexDollarString
 	}
 	return lexUQString
@@ -319,7 +319,7 @@ func lexDQStringElement(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return lexDQStringElement
 }
 
-// lexUQString
+// lexUQString lexes an Unquoted string (no quotes, no interpolation)
 //
 func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 	matchZeroOrMore(l, isPrintNonSpace)
@@ -332,6 +332,7 @@ func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 	m := l.Marker()
 	if matchOne(l, isHash) {
+		matchZeroOrMore(l, isSpaceOrTab)
 		// 2+ # = ignored as a comment
 		//
 		if matchOne(l, isHash) {
@@ -342,24 +343,28 @@ func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 			}
 			l.Clear() // Discard
 		} else {
-			l.EmitType(tokenHash)
-			ignoreSpace(l)
+			l.Clear() // Clear # and leading space
+			m = l.Marker()
 			// Possible attribute
 			//
 			if matchID(l) {
 				id := strings.ToUpper(l.PeekToken())
 				if t, ok := cmdConfigTokens[id]; ok {
+					// We've gone this far, let's go ahead and emit
+					// the attribute (vs rewind and re-scan)
+					//
 					l.Clear()
-					l.EmitToken(tokenConfigDescLine)
+					l.EmitToken(tokenNewline)
 					l.EmitType(tokenConfigDescEnd)
 					l.EmitType(t)
 					return nil
 				}
 			}
-			matchZeroOrMore(l, isPrintNonReturn)
-			l.EmitToken(tokenConfigDescLine)
-			matchNewline(l)
-			l.Clear()
+			m.Apply()
+			// Desc line
+			//
+			ctx.pushFn(lexDocBlockDesc)
+			return lexDocBlockNQString
 		}
 		return lexDocBlockDesc
 	}
@@ -368,11 +373,50 @@ func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
+// lexDocBlockNQString
+//
+func lexDocBlockNQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+	switch {
+	// Consume a run of printable, non-escape characters
+	//
+	case matchOneOrMore(l, isPrintNonBackslashNonDollarNonReturn):
+		l.EmitToken(tokenRunes)
+	// Back-slash '\'
+	//
+	case matchRune(l, runeBackSlash):
+		// Currently only '\' and '$' are escapable
+		// Anything else is considered two separate characters
+		//
+		if matchRune(l, runeBackSlash, runeDollar) {
+			l.EmitToken(tokenEscapeSequence)
+		} else {
+			l.EmitToken(tokenRunes)
+		}
+	// Variable reference
+	//
+	case l.CanPeek(1) && l.Peek(1) == runeDollar:
+		if l.CanPeek(2) && l.Peek(2) == runeLBrace {
+			ctx.pushFn(lexDocBlockNQString)
+			l.EmitType(tokenVarRefStart)
+			return lexVarRef
+		}
+		l.Next() // Consume $
+		l.EmitToken(tokenRunes)
+	default:
+		if matchNewline(l) {
+			l.EmitType(tokenNewline)
+		}
+		return nil
+	}
+	return lexDocBlockNQString
+}
+
 // lexDocBlockAttr
 //
 func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 	m := l.Marker()
 	if matchOne(l, isHash) {
+		matchZeroOrMore(l, isSpaceOrTab)
 		// 2+ # = ignored as a comment
 		//
 		if matchOne(l, isHash) {
@@ -384,7 +428,7 @@ func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 			l.Clear() // Discard
 			return lexDocBlockAttr
 		}
-		ignoreSpace(l) // Clears hash too
+		l.Clear() // Clear # and leading space
 		// Ignore whitespace-only comment
 		//
 		if matchNewlineOrEOF(l) {
@@ -424,11 +468,7 @@ func lexCmdShell(ctx *lexContext, l *lexer.Lexer) lexFn {
 //
 func lexCmdUsage(ctx *lexContext, l *lexer.Lexer) lexFn {
 	ignoreSpace(l)
-	matchZeroOrMore(l, isPrintNonReturn)
-	l.EmitToken(tokenRunes)
-	ignoreSpace(l)
-	ignoreEOL(l)
-	return nil
+	return lexDocBlockNQString
 }
 
 // lexCmdOpt: name [-l] [--long] [<label>] ["desc"]
@@ -512,10 +552,7 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 
 	// Desc?
 	//
-	if r, ok := tryPeekRune(l); ok && r == runeDQuote {
-		l.EmitType(tokenDQStringStart)
-	}
-	return nil
+	return lexDocBlockNQString
 }
 
 func lexCmdOptEnd(ctx *lexContext, l *lexer.Lexer) lexFn {
@@ -566,8 +603,17 @@ func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
 		// No default
 	}
 
+	return nil
+}
+
+// lexExpectNewline
+//
+func lexExpectNewline(ctx *lexContext, l *lexer.Lexer) lexFn {
 	ignoreSpace(l)
-	ignoreEOL(l)
+	if !matchNewlineOrEOF(l) {
+		l.EmitError("expecting end of line")
+	}
+	l.EmitType(tokenNewline)
 	return nil
 }
 

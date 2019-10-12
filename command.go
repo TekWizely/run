@@ -237,11 +237,14 @@ func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 		showCmdHelp(cmd)
 		os.Exit(2)
 	}
+	// TODO Maybe make args property instead of stashing in vars?
 	for name, value := range stringVals {
-		cmd.env[name] = value.String()
+		cmd.scope.vars[name] = value.String()
+		cmd.scope.AddExport(name)
 	}
 	for name, value := range boolVals {
-		cmd.env[name] = value.String()
+		cmd.scope.vars[name] = value.String()
+		cmd.scope.AddExport(name)
 	}
 	return flags.Args()
 }
@@ -391,6 +394,14 @@ func runHelp(_ *runfile) {
 //
 func runCommand(cmd *runCmd) {
 	os.Args = evaluateCmdOpts(cmd, os.Args)
-	shell := defaultIfEmpty(cmd.config.shell, cmd.attrs[".SHELL"])
-	executeCmdScript(shell, cmd.script, os.Args, cmd.env)
+	env := make(map[string]string)
+	for _, name := range cmd.scope.GetExports() {
+		if value, ok := cmd.scope.GetVar(name); ok {
+			env[name] = value
+		} else {
+			log.Println("Warning: exported variable not defined: ", name)
+		}
+	}
+	shell := defaultIfEmpty(cmd.config.shell, cmd.scope.attrs[".SHELL"])
+	executeCmdScript(shell, cmd.script, os.Args, env)
 }

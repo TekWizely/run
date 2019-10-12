@@ -3,14 +3,12 @@ package main
 // runfile
 //
 type runfile struct {
-	attrs   map[string]string // All keys uppercase. Keys include leading '.'
-	vars    map[string]string // Runfile variables
-	exports []string          // Exported variables
-	cmds    []*runCmd
+	scope *scope
+	cmds  []*runCmd
 }
 
 func (r *runfile) DefaultShell() (string, bool) {
-	shell, ok := r.attrs[".SHELL"]
+	shell, ok := r.scope.attrs[".SHELL"]
 	return shell, ok && len(shell) > 0
 }
 
@@ -18,10 +16,8 @@ func (r *runfile) DefaultShell() (string, bool) {
 //
 func processAST(ast *ast) *runfile {
 	rf := &runfile{
-		attrs:   map[string]string{},
-		vars:    map[string]string{},
-		exports: []string{},
-		cmds:    []*runCmd{},
+		scope: newScope(),
+		cmds:  []*runCmd{},
 	}
 	for _, node := range ast.nodes {
 		node.Apply(rf)
@@ -53,8 +49,7 @@ type runCmdConfig struct {
 type runCmd struct {
 	name   string
 	config *runCmdConfig
-	attrs  map[string]string
-	env    map[string]string
+	scope  *scope
 	script []string
 }
 
@@ -65,7 +60,7 @@ func (c *runCmd) Title() string {
 	return ""
 }
 func (c *runCmd) Shell() string {
-	return defaultIfEmpty(c.config.shell, c.attrs[".SHELL"])
+	return defaultIfEmpty(c.config.shell, c.scope.attrs[".SHELL"])
 }
 func (c *runCmd) EnableHelp() bool {
 	return len(c.config.desc) > 0 || len(c.config.usages) > 0 || len(c.config.opts) > 0

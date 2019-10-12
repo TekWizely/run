@@ -26,7 +26,6 @@ const (
 	tokenRunes
 	tokenEscapeSequence
 
-	tokenHash
 	tokenDollar
 	tokenLBrace
 	tokenRBrace

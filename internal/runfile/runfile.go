@@ -1,67 +1,74 @@
-package main
+package runfile
 
-// runfile
+// Runfile stores the processed file, ready to run.
 //
-type runfile struct {
-	scope *scope
-	cmds  []*runCmd
+type Runfile struct {
+	Scope *Scope
+	Cmds  []*RunCmd
 }
 
-func (r *runfile) DefaultShell() (string, bool) {
-	shell, ok := r.scope.attrs[".SHELL"]
+// NewRunfile is a convenience method.
+//
+func NewRunfile() *Runfile {
+	return &Runfile{
+		Scope: NewScope(),
+		Cmds:  []*RunCmd{},
+	}
+}
+
+// DefaultShell looks up .SHELL
+//
+func (r *Runfile) DefaultShell() (string, bool) {
+	shell, ok := r.Scope.Attrs[".SHELL"]
 	return shell, ok && len(shell) > 0
 }
 
-// processAST
+// RunCmdOpt captures an OPTION
 //
-func processAST(ast *ast) *runfile {
-	rf := &runfile{
-		scope: newScope(),
-		cmds:  []*runCmd{},
-	}
-	for _, node := range ast.nodes {
-		node.Apply(rf)
-	}
-	return rf
+type RunCmdOpt struct {
+	Name  string
+	Short rune
+	Long  string
+	Value string
+	Desc  string
 }
 
-// runCmdOpt
+// RunCmdConfig captures the configuration for a command.
 //
-type runCmdOpt struct {
-	name  string
-	short rune
-	long  string
-	value string
-	desc  string
+type RunCmdConfig struct {
+	Shell  string
+	Desc   []string
+	Usages []string
+	Opts   []*RunCmdOpt
 }
 
-// runCmdConfig
+// RunCmd captures a command.
 //
-type runCmdConfig struct {
-	shell  string
-	desc   []string
-	usages []string
-	opts   []*runCmdOpt
+type RunCmd struct {
+	Name   string
+	Config *RunCmdConfig
+	Scope  *Scope
+	Script []string
 }
 
-// runCmd
+// Title fetches the first line of the description as the command title.
 //
-type runCmd struct {
-	name   string
-	config *runCmdConfig
-	scope  *scope
-	script []string
-}
-
-func (c *runCmd) Title() string {
-	if len(c.config.desc) > 0 {
-		return c.config.desc[0]
+func (c *RunCmd) Title() string {
+	if len(c.Config.Desc) > 0 {
+		return c.Config.Desc[0]
 	}
 	return ""
 }
-func (c *runCmd) Shell() string {
-	return defaultIfEmpty(c.config.shell, c.scope.attrs[".SHELL"])
+
+// Shell fetches the shell for the command, defaulting to the global '.SHELL'.
+//
+func (c *RunCmd) Shell() string {
+	return defaultIfEmpty(c.Config.Shell, c.Scope.Attrs[".SHELL"])
 }
-func (c *runCmd) EnableHelp() bool {
-	return len(c.config.desc) > 0 || len(c.config.usages) > 0 || len(c.config.opts) > 0
+
+// EnableHelp returns whether or not a help screen should be shown for a command.
+// Returns false if there isn't any custom informaiton to display.
+//
+func (c *RunCmd) EnableHelp() bool {
+	return len(c.Config.Desc) > 0 || len(c.Config.Usages) > 0 || len(c.Config.Opts) > 0
 }

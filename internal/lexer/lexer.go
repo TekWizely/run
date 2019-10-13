@@ -1,4 +1,4 @@
-package main
+package lexer
 
 import (
 	"bytes"
@@ -7,61 +7,63 @@ import (
 
 	"github.com/tekwizely/go-parsing/lexer"
 	"github.com/tekwizely/go-parsing/lexer/token"
+
+	"github.com/tekwizely/run/internal/config"
 )
 
-// lexFn
+// LexFn is a lexer fun that takes a context
 //
-type lexFn func(*lexContext, *lexer.Lexer) lexFn
+type LexFn func(*LexContext, *lexer.Lexer) LexFn
 
-// lexContext
+// LexContext allows us to track additional states of the lexer
 //
-type lexContext struct {
-	fn      lexFn
+type LexContext struct {
+	Fn      LexFn
 	fnStack *list.List
-	tokens  token.Nexter
+	Tokens  token.Nexter
 }
 
 // lex delegates incoming lexer calls to the configured fn
 //
-func (ctx *lexContext) lex(l *lexer.Lexer) lexer.Fn {
-	fn := ctx.fn
+func (ctx *LexContext) lex(l *lexer.Lexer) lexer.Fn {
+	fn := ctx.Fn
 	// EOF ?
 	//
 	if fn == nil {
 		if ctx.fnStack.Len() == 0 {
 			return nil
 		}
-		fn = ctx.fnStack.Remove(ctx.fnStack.Back()).(lexFn)
-		traceFn("Popped lexer function", fn)
+		fn = ctx.fnStack.Remove(ctx.fnStack.Back()).(LexFn)
+		config.TraceFn("Popped lexer function", fn)
 	}
 	// assert(fn != nil)
-	traceFn("Calling lexer function", fn)
-	ctx.fn = fn(ctx, l)
+	config.TraceFn("Calling lexer function", fn)
+	ctx.Fn = fn(ctx, l)
 	return ctx.lex
 }
 
-// pushFn
+// PushFn stores the specified function on the fn stack.
 //
-func (ctx *lexContext) pushFn(fn lexFn) {
+func (ctx *LexContext) PushFn(fn LexFn) {
 	ctx.fnStack.PushBack(fn)
-	traceFn("Pushed lexer function", fn)
+	config.TraceFn("Pushed lexer function", fn)
 }
 
-// lex
+// Lex initiates the lexer against a byte array
 //
-func lex(fileBytes []byte) *lexContext {
-	reader := &readerIgnoreCR{r: bytes.NewReader(fileBytes)}
-	ctx := &lexContext{
-		fn:      lexMain,
+func Lex(fileBytes []byte) *LexContext {
+	reader := newReaderIgnoreCR(bytes.NewReader(fileBytes))
+	ctx := &LexContext{
+		Fn:      LexMain,
 		fnStack: list.New(),
 	}
-	ctx.tokens = lexer.LexRuneReader(reader, ctx.lex)
+	ctx.Tokens = lexer.LexRuneReader(reader, ctx.lex)
 	return ctx
 }
 
-// lexMain
+// LexMain is the primary lexer entry point
 //
-func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 
 	switch {
 	// :=
@@ -69,13 +71,13 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 	case l.CanPeek(2) && l.Peek(1) == runeColon && l.Peek(2) == runeEquals:
 		l.Next() // :
 		l.Next() // =
-		l.EmitType(tokenEquals)
+		l.EmitType(TokenEquals)
 	// ?=
 	//
 	case l.CanPeek(2) && l.Peek(1) == runeQMark && l.Peek(2) == runeEquals:
 		l.Next() // ?
 		l.Next() // =
-		l.EmitType(tokenQMarkEquals)
+		l.EmitType(TokenQMarkEquals)
 	// Single-Char Token - Check AFTER multi-char tokens
 	//
 	case bytes.ContainsRune(singleRunes, l.Peek(1)):
@@ -93,16 +95,16 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 			if matchOneOrMore(l, isSpaceOrTab) {
 				l.Clear()
 				if matchOneOrMore(l, isPrintNonReturn) {
-					l.EmitToken(tokenConfigDescLine)
+					l.EmitToken(TokenConfigDescLine)
 					if matchNewline(l) {
 						l.Clear()
 					}
-					return lexMain
+					return LexMain
 				}
 			}
 			if matchNewlineOrEOF(l) {
-				l.EmitType(tokenHashLine)
-				return lexMain
+				l.EmitType(TokenHashLine)
+				return LexMain
 			}
 		}
 		// Consume rest of line as a standard comment
@@ -117,11 +119,11 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 		l.Clear() // Discard
 	// Newline
 	case matchNewline(l):
-		l.EmitType(tokenNewline)
+		l.EmitType(TokenNewline)
 	// DotID
 	//
 	case matchDotID(l):
-		l.EmitToken(tokenDotID)
+		l.EmitToken(TokenDotID)
 	// ID
 	//
 	case matchID(l):
@@ -129,7 +131,7 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 		if t, ok := mainTokens[name]; ok {
 			l.EmitType(t)
 		} else {
-			l.EmitToken(tokenID)
+			l.EmitToken(TokenID)
 		}
 	// Unknown
 	//
@@ -138,12 +140,12 @@ func lexMain(ctx *lexContext, l *lexer.Lexer) lexFn {
 		return nil
 	}
 
-	return lexMain
+	return LexMain
 }
 
-// lexAssignmentValue delegates to other rValue lexers
+// LexAssignmentValue delegates to other rValue lexers
 //
-func lexAssignmentValue(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexAssignmentValue(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Consume leading space
 	//
 	if matchOneOrMore(l, isSpaceOrTab) {
@@ -154,11 +156,11 @@ func lexAssignmentValue(ctx *lexContext, l *lexer.Lexer) lexFn {
 	// Does it look like a single-quoted string?
 	//
 	case runeSQuote:
-		l.EmitType(tokenSQStringStart)
-		return lexSQString
+		l.EmitType(TokenSQStringStart)
+		return LexSQString
 	case runeDQuote:
-		l.EmitType(tokenDQStringStart)
-		return lexDQString
+		l.EmitType(TokenDQStringStart)
+		return LexDQString
 	case runeDollar:
 		return lexDollarString
 	}
@@ -167,60 +169,60 @@ func lexAssignmentValue(ctx *lexContext, l *lexer.Lexer) lexFn {
 
 // lexDollarString
 //
-func lexDollarString(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexDollarString(_ *LexContext, l *lexer.Lexer) LexFn {
 	if l.CanPeek(1) {
 		if l.Peek(1) == runeDollar {
 			if l.CanPeek(2) {
 				switch l.Peek(2) {
 				case runeLBrace:
-					l.EmitType(tokenVarRefStart)
+					l.EmitType(TokenVarRefStart)
 					return nil
 				case runeLParen:
-					l.EmitType(tokenSubCmdStart)
+					l.EmitType(TokenSubCmdStart)
 					return nil
 				}
 			}
 		}
 	}
 	expectRune(l, runeDollar, "expecting dollar ('$')")
-	l.EmitType(tokenDollar)
+	l.EmitType(TokenDollar)
 	return nil
 }
 
-// lexVarRef [ '$' '{' [A-Za-z0-9_.]* '}' ]
+// LexVarRef matches: [ '$' '{' [A-Za-z0-9_.]* '}' ]
 //
-func lexVarRef(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexVarRef(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Dollar
 	//
 	expectRune(l, runeDollar, "expecting dollar ('$')")
-	l.EmitType(tokenDollar)
+	l.EmitType(TokenDollar)
 	// Open Brace
 	//
 	expectRune(l, runeLBrace, "expecting l-brace ('{')")
-	l.EmitType(tokenLBrace)
+	l.EmitType(TokenLBrace)
 	// Variable Name
 	//
 	matchZeroOrMore(l, isAlphaNumDotUnder)
-	l.EmitToken(tokenRunes) // Could be empty
+	l.EmitToken(TokenRunes) // Could be empty
 	// Close Brace
 	//
 	expectRune(l, runeRBrace, "expecting r-brace ('}')")
-	l.EmitType(tokenRBrace)
+	l.EmitType(TokenRBrace)
 
 	return nil
 }
 
-// lexSubCmd - [ '$' '(' [::print::] ')' ]
+// LexSubCmd matches: [ '$' '(' [::print::] ')' ]
 //
-func lexSubCmd(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexSubCmd(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Dollar
 	//
 	expectRune(l, runeDollar, "expecting dollar ('$')")
-	l.EmitType(tokenDollar)
+	l.EmitType(TokenDollar)
 	// Open Paren
 	//
 	expectRune(l, runeLParen, "expecting l-paren ('(')")
-	l.EmitType(tokenLParen)
+	l.EmitType(TokenLParen)
 	// Keep going until we find close paren
 	//
 	for l.CanPeek(1) {
@@ -228,7 +230,7 @@ func lexSubCmd(ctx *lexContext, l *lexer.Lexer) lexFn {
 		// Consume a run of printable, non-paren non-escape characters
 		//
 		case matchOneOrMore(l, isPrintNonParenNonBackslash):
-			l.EmitToken(tokenRunes)
+			l.EmitToken(TokenRunes)
 		// Back-slash '\'
 		//
 		case matchRune(l, runeBackSlash):
@@ -236,68 +238,68 @@ func lexSubCmd(ctx *lexContext, l *lexer.Lexer) lexFn {
 			// Anything else is considered two separate characters
 			//
 			if matchRune(l, runeBackSlash, runeLParen, runeRParen) {
-				l.EmitToken(tokenEscapeSequence)
+				l.EmitToken(TokenEscapeSequence)
 			} else {
-				l.EmitToken(tokenRunes)
+				l.EmitToken(TokenRunes)
 			}
 		// Better be Close Paren ')'
 		//
 		default:
 			expectRune(l, runeRParen, "expecting r-paren (')')")
-			l.EmitType(tokenRParen)
+			l.EmitType(TokenRParen)
 			return nil
 		}
 	}
 	return nil
 }
 
-// lexSQString lexes a Single-Quoted String
+// LexSQString lexes a Single-Quoted String
 // No escapable sequences in SQuotes, not even '\''
 //
-func lexSQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexSQString(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Open quote
 	//
 	expectRune(l, runeSQuote, "expecting single-quote (\"'\")")
-	l.EmitType(tokenSQuote)
+	l.EmitType(TokenSQuote)
 	// Match quoted value as a one-shot
 	//
 	matchZeroOrMore(l, isPrintNonSQuote)
-	l.EmitToken(tokenRunes) // Could be empty
+	l.EmitToken(TokenRunes) // Could be empty
 	// Close quote
 	//
 	expectRune(l, runeSQuote, "expecting single-quote (\"'\")")
-	l.EmitType(tokenSQuote)
+	l.EmitType(TokenSQuote)
 
 	return nil
 }
 
-// lexDQString lexes a Double-Quoted String
+// LexDQString lexes a Double-Quoted String
 //
-func lexDQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexDQString(ctx *LexContext, l *lexer.Lexer) LexFn {
 	// Open quote
 	//
 	expectRune(l, runeDQuote, "expecting double-quote ('\"')")
-	l.EmitType(tokenDQuote)
-	ctx.pushFn(lexEndDQString)
+	l.EmitType(TokenDQuote)
+	ctx.PushFn(lexEndDQString)
 	return lexDQStringElement
 }
 
 // lexEndDQString
 //
-func lexEndDQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexEndDQString(_ *LexContext, l *lexer.Lexer) LexFn {
 	expectRune(l, runeDQuote, "expecting double-quote ('\"')")
-	l.EmitType(tokenDQuote)
+	l.EmitType(TokenDQuote)
 	return nil
 }
 
 // lexDQStringElement
 //
-func lexDQStringElement(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexDQStringElement(ctx *LexContext, l *lexer.Lexer) LexFn {
 	switch {
 	// Consume a run of printable, non-quote non-escape characters
 	//
 	case matchOneOrMore(l, isPrintNonDQuoteNonBackslashNonDollar):
-		l.EmitToken(tokenRunes)
+		l.EmitToken(TokenRunes)
 	// Back-slash '\'
 	//
 	case matchRune(l, runeBackSlash):
@@ -305,12 +307,12 @@ func lexDQStringElement(ctx *lexContext, l *lexer.Lexer) lexFn {
 		// Anything else is considered two separate characters
 		//
 		if matchRune(l, runeBackSlash, runeDQuote, runeDollar) {
-			l.EmitToken(tokenEscapeSequence)
+			l.EmitToken(TokenEscapeSequence)
 		} else {
-			l.EmitToken(tokenRunes)
+			l.EmitToken(TokenRunes)
 		}
 	case l.CanPeek(1) && l.Peek(1) == runeDollar:
-		ctx.pushFn(lexDQStringElement)
+		ctx.PushFn(lexDQStringElement)
 		return lexDollarString
 
 	default:
@@ -321,15 +323,15 @@ func lexDQStringElement(ctx *lexContext, l *lexer.Lexer) lexFn {
 
 // lexUQString lexes an Unquoted string (no quotes, no interpolation)
 //
-func lexUQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexUQString(_ *LexContext, l *lexer.Lexer) LexFn {
 	matchZeroOrMore(l, isPrintNonSpace)
-	l.EmitToken(tokenRunes) // Could be empty
+	l.EmitToken(TokenRunes) // Could be empty
 	return nil
 }
 
-// lexDocBlockDesc
+// LexDocBlockDesc lexes a single dock block description line.
 //
-func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexDocBlockDesc(ctx *LexContext, l *lexer.Lexer) LexFn {
 	m := l.Marker()
 	if matchOne(l, isHash) {
 		matchZeroOrMore(l, isSpaceOrTab)
@@ -354,8 +356,8 @@ func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 					// the attribute (vs rewind and re-scan)
 					//
 					l.Clear()
-					l.EmitToken(tokenNewline)
-					l.EmitType(tokenConfigDescEnd)
+					l.EmitToken(TokenNewline)
+					l.EmitType(TokenConfigDescEnd)
 					l.EmitType(t)
 					return nil
 				}
@@ -363,24 +365,24 @@ func lexDocBlockDesc(ctx *lexContext, l *lexer.Lexer) lexFn {
 			m.Apply()
 			// Desc line
 			//
-			ctx.pushFn(lexDocBlockDesc)
+			ctx.PushFn(LexDocBlockDesc)
 			return lexDocBlockNQString
 		}
-		return lexDocBlockDesc
+		return LexDocBlockDesc
 	}
 	m.Apply()
-	l.EmitType(tokenConfigDescEnd)
+	l.EmitType(TokenConfigDescEnd)
 	return nil
 }
 
 // lexDocBlockNQString
 //
-func lexDocBlockNQString(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexDocBlockNQString(ctx *LexContext, l *lexer.Lexer) LexFn {
 	switch {
 	// Consume a run of printable, non-escape characters
 	//
 	case matchOneOrMore(l, isPrintNonBackslashNonDollarNonReturn):
-		l.EmitToken(tokenRunes)
+		l.EmitToken(TokenRunes)
 	// Back-slash '\'
 	//
 	case matchRune(l, runeBackSlash):
@@ -388,32 +390,32 @@ func lexDocBlockNQString(ctx *lexContext, l *lexer.Lexer) lexFn {
 		// Anything else is considered two separate characters
 		//
 		if matchRune(l, runeBackSlash, runeDollar) {
-			l.EmitToken(tokenEscapeSequence)
+			l.EmitToken(TokenEscapeSequence)
 		} else {
-			l.EmitToken(tokenRunes)
+			l.EmitToken(TokenRunes)
 		}
 	// Variable reference
 	//
 	case l.CanPeek(1) && l.Peek(1) == runeDollar:
 		if l.CanPeek(2) && l.Peek(2) == runeLBrace {
-			ctx.pushFn(lexDocBlockNQString)
-			l.EmitType(tokenVarRefStart)
-			return lexVarRef
+			ctx.PushFn(lexDocBlockNQString)
+			l.EmitType(TokenVarRefStart)
+			return LexVarRef
 		}
 		l.Next() // Consume $
-		l.EmitToken(tokenRunes)
+		l.EmitToken(TokenRunes)
 	default:
 		if matchNewline(l) {
-			l.EmitType(tokenNewline)
+			l.EmitType(TokenNewline)
 		}
 		return nil
 	}
 	return lexDocBlockNQString
 }
 
-// lexDocBlockAttr
+// LexDocBlockAttr lexes a doc block attribute line
 //
-func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexDocBlockAttr(_ *LexContext, l *lexer.Lexer) LexFn {
 	m := l.Marker()
 	if matchOne(l, isHash) {
 		matchZeroOrMore(l, isSpaceOrTab)
@@ -426,20 +428,20 @@ func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 				l.Next()
 			}
 			l.Clear() // Discard
-			return lexDocBlockAttr
+			return LexDocBlockAttr
 		}
 		l.Clear() // Clear # and leading space
 		// Ignore whitespace-only comment
 		//
 		if matchNewlineOrEOF(l) {
 			l.Clear() // Discard
-			return lexDocBlockAttr
+			return LexDocBlockAttr
 		}
 		if matchID(l) {
 			name := strings.ToUpper(l.PeekToken())
 			if t, ok := cmdConfigTokens[name]; ok {
 				l.EmitType(t)
-				return lexDocBlockAttr
+				return LexDocBlockAttr
 			}
 			l.EmitErrorf("Unrecognized command attribute: %s", name)
 			return nil
@@ -448,32 +450,32 @@ func lexDocBlockAttr(ctx *lexContext, l *lexer.Lexer) lexFn {
 		return nil
 	}
 	m.Apply()
-	l.EmitType(tokenConfigEnd)
+	l.EmitType(TokenConfigEnd)
 	return nil
 }
 
-// lexCmdShell
+// LexCmdShell lexes a doc block SHELL line
 //
-func lexCmdShell(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexCmdShell(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	if matchID(l) {
-		l.EmitToken(tokenID)
+		l.EmitToken(TokenID)
 	}
 	ignoreSpace(l)
 	ignoreEOL(l)
 	return nil
 }
 
-// lexCmdUsage
+// LexCmdUsage lexes a doc block USAGE line
 //
-func lexCmdUsage(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexCmdUsage(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	return lexDocBlockNQString
 }
 
-// lexCmdOpt: name [-l] [--long] [<label>] ["desc"]
+// LexCmdOpt matches: name [-l] [--long] [<label>] ["desc"]
 //
-func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexCmdOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 
 	// ID
@@ -482,7 +484,7 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 		l.EmitError("Expecting option name")
 		return nil
 	}
-	l.EmitToken(tokenConfigOptName)
+	l.EmitToken(TokenConfigOptName)
 
 	// Whitespace
 	//
@@ -498,7 +500,7 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 	// Short flag?
 	//
 	if matchOne(l, isAlphaNum) {
-		l.EmitToken(tokenConfigOptShort)
+		l.EmitToken(TokenConfigOptShort)
 
 		// Whitespace
 		//
@@ -526,7 +528,7 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 		expectRune(l, runeDash, "Expecting '-'")
 		l.Clear()
 		if matchOneOrMore(l, isAlphaNum) {
-			l.EmitToken(tokenConfigOptLong)
+			l.EmitToken(TokenConfigOptLong)
 		} else {
 			l.EmitError("Expecting long flag name")
 		}
@@ -541,7 +543,7 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 	if matchRune(l, runeLAngle) {
 		l.Clear()
 		matchOneOrMore(l, isConfigOptValue)
-		l.EmitToken(tokenConfigOptValue)
+		l.EmitToken(TokenConfigOptValue)
 		expectRune(l, runeRAngle, "Expecting '>'")
 		l.Clear()
 	}
@@ -555,20 +557,22 @@ func lexCmdOpt(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return lexDocBlockNQString
 }
 
-func lexCmdOptEnd(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexCmdOptEnd(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	ignoreEOL(l)
 	l.EmitType(tokenConfigOptEnd)
 	return nil
 }
 
-func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
+// LexExport lexes a doc block EXPORT line
+//
+func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	if !matchID(l) {
 		l.EmitError("Expecting variable name")
 		return nil
 	}
-	l.EmitToken(tokenID)
+	l.EmitToken(TokenID)
 	ignoreSpace(l)
 
 	switch {
@@ -576,29 +580,29 @@ func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
 	//
 	case peekRuneEquals(l, runeComma):
 		for matchRune(l, runeComma) {
-			l.EmitType(tokenComma)
+			l.EmitType(TokenComma)
 			ignoreSpace(l)
 			if !matchID(l) {
 				l.EmitError("Expecting variable name")
 				return nil
 			}
-			l.EmitToken(tokenID)
+			l.EmitToken(TokenID)
 			ignoreSpace(l)
 		}
 	// '='
 	//
 	case matchRune(l, runeEquals):
-		l.EmitType(tokenEquals)
+		l.EmitType(TokenEquals)
 	// ':='
 	//
 	case matchRune(l, runeColon):
 		expectRune(l, runeEquals, "Expecting '='")
-		l.EmitType(tokenEquals)
+		l.EmitType(TokenEquals)
 	// '?='
 	//
 	case matchRune(l, runeQMark):
 		expectRune(l, runeEquals, "Expecting '='")
-		l.EmitType(tokenQMarkEquals)
+		l.EmitType(TokenQMarkEquals)
 	default:
 		// No default
 	}
@@ -606,35 +610,35 @@ func lexExport(ctx *lexContext, l *lexer.Lexer) lexFn {
 	return nil
 }
 
-// lexExpectNewline
+// LexExpectNewline matches whitespace + newline or throws an error.
 //
-func lexExpectNewline(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexExpectNewline(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	if !matchNewlineOrEOF(l) {
 		l.EmitError("expecting end of line")
 	}
-	l.EmitType(tokenNewline)
+	l.EmitType(TokenNewline)
 	return nil
 }
 
-// lexCmdScriptMaybeLBrace
+// LexCmdScriptMaybeLBrace lexes a script with an optional leading LBrace.
 // If command header line ends with ':',
 // then first line of script may actually be '{'
 //
-func lexCmdScriptMaybeLBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexCmdScriptMaybeLBrace(_ *LexContext, l *lexer.Lexer) LexFn {
 	if matchRune(l, runeLBrace) {
-		l.EmitType(tokenLBrace)
-		return lexCmdScriptAfterLBrace
+		l.EmitType(TokenLBrace)
+		return LexCmdScriptAfterLBrace
 	}
 	return lexCmdScriptLine
 }
 
-// lexCmdScriptAfterLBrace
+// LexCmdScriptAfterLBrace finishes a script after the trailing LBrace.
 // Presumed to start immediately after '{'
 // Consumes remainder of '{' line, so that cmdScriptLine loop always enters
 // at the beginning of a line
 //
-func lexCmdScriptAfterLBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexCmdScriptAfterLBrace(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Discard whitespace to EOL
 	//
 	matchZeroOrMore(l, isSpaceOrTab)
@@ -646,12 +650,12 @@ func lexCmdScriptAfterLBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
 // lexCmdScriptLine Lexes one full line at a time
 // Expects to enter fn at start of a line
 //
-func lexCmdScriptLine(ctx *lexContext, l *lexer.Lexer) lexFn {
+func lexCmdScriptLine(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Blank line is part of script
 	// Need to check this before !whitespace
 	//
 	if matchNewline(l) {
-		l.EmitToken(tokenScriptLine)
+		l.EmitToken(TokenScriptLine)
 		return lexCmdScriptLine
 	}
 	m := l.Marker()
@@ -659,7 +663,7 @@ func lexCmdScriptLine(ctx *lexContext, l *lexer.Lexer) lexFn {
 	//
 	if !matchOneOrMore(l, isSpaceOrTab) {
 		m.Apply()
-		l.EmitType(tokenScriptEnd)
+		l.EmitType(TokenScriptEnd)
 		return nil
 	}
 	// We have a script line
@@ -668,15 +672,15 @@ func lexCmdScriptLine(ctx *lexContext, l *lexer.Lexer) lexFn {
 	for !matchNewline(l) {
 		l.Next()
 	}
-	l.EmitToken(tokenScriptLine)
+	l.EmitToken(TokenScriptLine)
 	return lexCmdScriptLine
 }
 
-// lexCmdScriptMaybeRBrace
+// LexCmdScriptMaybeRBrace tries to match an RBrace
 //
-func lexCmdScriptMaybeRBrace(ctx *lexContext, l *lexer.Lexer) lexFn {
+func LexCmdScriptMaybeRBrace(_ *LexContext, l *lexer.Lexer) LexFn {
 	if matchRune(l, runeRBrace) {
-		l.EmitType(tokenRBrace)
+		l.EmitType(TokenRBrace)
 	}
 	return nil
 }
@@ -696,7 +700,7 @@ func matchNewline(l *lexer.Lexer) bool {
 	return false
 }
 
-// matchNewlineOrEOF
+// matchNewlineOrEOF tries to match a newline or EOF, returnning success or failure.
 //
 func matchNewlineOrEOF(l *lexer.Lexer) bool {
 	if matchNewline(l) {

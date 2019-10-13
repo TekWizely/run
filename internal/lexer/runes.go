@@ -1,7 +1,6 @@
-package main
+package lexer
 
 import (
-	"io"
 	"unicode"
 	"unicode/utf8"
 
@@ -15,7 +14,7 @@ const (
 	runeSpace = ' '
 	runeTab   = '\t'
 	// NOTE: You probably want matchNewline()
-	// runeNewline = '\n'
+	// runeNewline   = '\n'
 	// runeReturn    = '\r'
 	runeHash      = '#'
 	runeDollar    = '$'
@@ -40,22 +39,22 @@ const (
 //
 var (
 	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace}
-	singleTokens = []token.Type{tokenColon, tokenEquals, tokenLParen, tokenRParen, tokenLBrace, tokenRBrace}
+	singleTokens = []token.Type{TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace}
 )
 var mainTokens = map[string]token.Type{
-	"COMMAND": tokenCommand,
-	"CMD":     tokenCommand,
-	"EXPORT":  tokenExport,
+	"COMMAND": TokenCommand,
+	"CMD":     TokenCommand,
+	"EXPORT":  TokenExport,
 }
 
 // Cmd Config Tokens
 //
 var cmdConfigTokens = map[string]token.Type{
-	"SHELL":  tokenConfigShell,
-	"USAGE":  tokenConfigUsage,
-	"OPTION": tokenConfigOpt,
-	"OPT":    tokenConfigOpt,
-	"EXPORT": tokenConfigExport,
+	"SHELL":  TokenConfigShell,
+	"USAGE":  TokenConfigUsage,
+	"OPTION": TokenConfigOpt,
+	"OPT":    TokenConfigOpt,
+	"EXPORT": TokenConfigExport,
 }
 
 func isAlpha(r rune) bool {
@@ -82,6 +81,8 @@ func isHash(r rune) bool {
 	return r == runeHash
 }
 
+// isSpaceOrTab matches tab or space
+//
 func isSpaceOrTab(r rune) bool {
 	return r == runeSpace || r == runeTab
 }
@@ -102,10 +103,6 @@ func isPrintNonSQuote(r rune) bool {
 	return r != runeSQuote && unicode.IsPrint(r)
 }
 
-func isPrintNonDQuoteNonBackslash(r rune) bool {
-	return r != runeDQuote && r != runeBackSlash && unicode.IsPrint(r)
-}
-
 func isPrintNonDQuoteNonBackslashNonDollar(r rune) bool {
 	return r != runeDQuote && r != runeBackSlash && r != runeDollar && unicode.IsPrint(r)
 }
@@ -118,6 +115,8 @@ func isPrintNonBackslashNonDollarNonReturn(r rune) bool {
 	return r != runeBackSlash && r != runeDollar && isPrintNonReturn(r)
 }
 
+// tryPeekRune tries to peek the next rune
+//
 func tryPeekRune(l *lexer.Lexer) (rune, bool) {
 	if l.CanPeek(1) {
 		return l.Peek(1), true
@@ -135,23 +134,4 @@ func expectRune(l *lexer.Lexer, r rune, msg string) {
 		return
 	}
 	l.Next()
-}
-
-// ReaderIgnoreCR wraps a RuneReader, filtering errOut '\r'
-// Useful for input sources that use '\r'+'\n' for end-of-line
-//
-func ReaderIgnoreCR(r io.RuneReader) io.RuneReader {
-	return &readerIgnoreCR{r: r}
-}
-
-type readerIgnoreCR struct {
-	r io.RuneReader
-}
-
-func (c *readerIgnoreCR) ReadRune() (r rune, size int, err error) {
-	r, size, err = c.r.ReadRune()
-	if size == 1 && r == '\r' {
-		r, size, err = c.r.ReadRune()
-	}
-	return
 }

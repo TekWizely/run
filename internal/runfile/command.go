@@ -1,4 +1,4 @@
-package main
+package runfile
 
 import (
 	"flag"
@@ -7,13 +7,16 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/tekwizely/run/internal/config"
+	"github.com/tekwizely/run/internal/exec"
 )
 
-// normalizeCmdScript
+// NormalizeCmdScript normalizes the command script text.
 // Removes leading and trailing lines that are empty or whitespace only.
 // Removes all leading whitespace that matches leading whitespace on first non-empty line
 //
-func normalizeCmdScript(txt []string) []string {
+func NormalizeCmdScript(txt []string) []string {
 	if len(txt) == 0 {
 		return txt
 	}
@@ -52,9 +55,10 @@ func normalizeCmdScript(txt []string) []string {
 	return txt
 }
 
-// normalizeCmdDesc
+// NormalizeCmdDesc normalizes the command description text.
 // Removes leading and trailing lines that are empty or whitespace only.
-func normalizeCmdDesc(txt []string) []string {
+//
+func NormalizeCmdDesc(txt []string) []string {
 	if len(txt) == 0 {
 		return txt
 	}
@@ -90,13 +94,27 @@ func isWhitespace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
-// flagOpt
+// cmdFlagOpt describes a command option flag.
 //
-type flagOpt interface {
+type cmdFlagOpt interface {
+	// Name fetches the name of the option variable name (not the arg short/long).
+	//
 	Name() string
+	// IsSet returns true if the flag was set from the arguments.
+	//
 	IsSet() bool
-	String() string
+	// Get retrieves the value.
+	// Implements flag.Getter.
+	//
+	Get() interface{}
+	// Set sets value.
+	// Implements flag.Value.
+	//
 	Set(string) error
+	// String gets the value as a string.
+	// Implements flag.Value.
+	//
+	String() string
 }
 
 // stringOpt
@@ -166,8 +184,8 @@ func (a *boolOpt) IsBoolFlag() bool {
 
 // evaluateCmdOpts
 //
-func evaluateCmdOpts(cmd *runCmd, args []string) []string {
-	flags := flag.NewFlagSet(cmd.name, flag.ExitOnError)
+func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
+	flags := flag.NewFlagSet(cmd.Name, flag.ExitOnError)
 	// Invoked if error parsing arguments.
 	//
 	flags.Usage = func() {
@@ -186,40 +204,40 @@ func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 	help := false
 	hasHelpShort := false
 	hasHelpLong := false
-	for _, opt := range cmd.config.opts {
+	for _, opt := range cmd.Config.Opts {
 		// If explicitly added, then cannot be overridden
 		//
 		// 'h' != 'H'
-		if opt.short == 'h' {
+		if opt.Short == 'h' {
 			hasHelpShort = true
 		}
-		if strings.EqualFold(opt.long, "help") {
+		if strings.EqualFold(opt.Long, "help") {
 			hasHelpLong = true
 		}
-		optName := opt.name
-		var flag flagOpt
+		optName := opt.Name
+		var flagOpt cmdFlagOpt
 		// Bool or String?
 		//
-		if len(opt.value) > 0 {
+		if len(opt.Value) > 0 {
 			var s = new(string)
 			var sOpt = &stringOpt{name: optName, value: s}
 			stringVals[optName] = sOpt
-			flag = sOpt
+			flagOpt = sOpt
 		} else {
 			var b = new(bool)
 			var bOpt = &boolOpt{name: optName, value: b}
 			boolVals[optName] = bOpt
-			flag = bOpt
+			flagOpt = bOpt
 		}
 		// Short?
 		//
-		if opt.short != 0 {
-			flags.Var(flag, string([]rune{opt.short}), "")
+		if opt.Short != 0 {
+			flags.Var(flagOpt, string([]rune{opt.Short}), "")
 		}
 		// Long?
 		//
-		if len(opt.long) > 0 {
-			flags.Var(flag, strings.ToLower(opt.long), "")
+		if len(opt.Long) > 0 {
+			flags.Var(flagOpt, strings.ToLower(opt.Long), "")
 		}
 	}
 	if !hasHelpShort {
@@ -234,34 +252,34 @@ func evaluateCmdOpts(cmd *runCmd, args []string) []string {
 	if help {
 		// Show full help details
 		//
-		showCmdHelp(cmd)
+		ShowCmdHelp(cmd)
 		os.Exit(2)
 	}
 	// TODO Maybe make args property instead of stashing in vars?
 	for name, value := range stringVals {
-		cmd.scope.vars[name] = value.String()
-		cmd.scope.AddExport(name)
+		cmd.Scope.Vars[name] = value.String()
+		cmd.Scope.AddExport(name)
 	}
 	for name, value := range boolVals {
-		cmd.scope.vars[name] = value.String()
-		cmd.scope.AddExport(name)
+		cmd.Scope.Vars[name] = value.String()
+		cmd.Scope.AddExport(name)
 	}
 	return flags.Args()
 }
 
-// showCmdHelp shows cmd, desc, usage and opts
+// ShowCmdHelp shows cmd, desc, usage and opts
 //
-func showCmdHelp(cmd *runCmd) {
+func ShowCmdHelp(cmd *RunCmd) {
 	if !cmd.EnableHelp() {
-		fmt.Fprintf(errOut, "%s (%s): No help available.\n", cmd.name, cmd.Shell())
+		fmt.Fprintf(config.ErrOut, "%s (%s): No help available.\n", cmd.Name, cmd.Shell())
 		return
 	}
-	fmt.Fprintf(errOut, "%s (%s):\n", cmd.name, cmd.Shell())
+	fmt.Fprintf(config.ErrOut, "%s (%s):\n", cmd.Name, cmd.Shell())
 	// Desc
 	//
-	if len(cmd.config.desc) > 0 {
-		for _, desc := range cmd.config.desc {
-			fmt.Fprintf(errOut, "  %s\n", desc)
+	if len(cmd.Config.Desc) > 0 {
+		for _, desc := range cmd.Config.Desc {
+			fmt.Fprintf(config.ErrOut, "  %s\n", desc)
 		}
 		// } else {
 		// 	fmt.Fprintf(errOut, "%s:\n", cmd.name)
@@ -269,110 +287,110 @@ func showCmdHelp(cmd *runCmd) {
 	showCmdUsage(cmd)
 }
 
-// showCmdUsage show only usage + opts
+// ShowCmdUsage show only usage + opts
 //
-func showCmdUsage(cmd *runCmd) {
+func showCmdUsage(cmd *RunCmd) {
 	if !cmd.EnableHelp() {
-		fmt.Fprintf(errOut, "%s (%s): No help available.\n", cmd.name, cmd.Shell())
+		fmt.Fprintf(config.ErrOut, "%s (%s): No help available.\n", cmd.Name, cmd.Shell())
 		return
 	}
 	// Usages
 	//
-	for i, usage := range cmd.config.usages {
+	for i, usage := range cmd.Config.Usages {
 		or := "or"
 		if i == 0 {
-			fmt.Fprintf(errOut, "Usage:\n")
+			fmt.Fprintf(config.ErrOut, "Usage:\n")
 			or = "  " // 2 spaces
 		}
-		pad := strings.Repeat(" ", len(cmd.name)-1)
+		pad := strings.Repeat(" ", len(cmd.Name)-1)
 		if usage[0] == '(' {
-			fmt.Fprintf(errOut, "       %s %s\n", pad, usage)
+			fmt.Fprintf(config.ErrOut, "       %s %s\n", pad, usage)
 		} else {
-			fmt.Fprintf(errOut, "  %s   %s %s\n", or, cmd.name, usage)
+			fmt.Fprintf(config.ErrOut, "  %s   %s %s\n", or, cmd.Name, usage)
 		}
 	}
 	hasHelpShort := false
 	hasHelpLong := false
-	for _, opt := range cmd.config.opts {
-		if opt.short == 'h' {
+	for _, opt := range cmd.Config.Opts {
+		if opt.Short == 'h' {
 			hasHelpShort = true
 		}
-		if opt.long == "help" {
+		if opt.Long == "help" {
 			hasHelpLong = true
 		}
 	}
 	// Options
 	//
-	if len(cmd.config.opts) > 0 {
-		fmt.Fprintln(errOut, "Options:")
+	if len(cmd.Config.Opts) > 0 {
+		fmt.Fprintln(config.ErrOut, "Options:")
 		if !hasHelpShort || !hasHelpLong {
 			switch {
 			case !hasHelpShort && hasHelpLong:
-				fmt.Fprintln(errOut, "  -h")
+				fmt.Fprintln(config.ErrOut, "  -h")
 			case hasHelpShort && !hasHelpLong:
-				fmt.Fprintln(errOut, "  --help")
+				fmt.Fprintln(config.ErrOut, "  --help")
 			default:
-				fmt.Fprintln(errOut, "  -h, --help")
+				fmt.Fprintln(config.ErrOut, "  -h, --help")
 			}
-			fmt.Fprintln(errOut, "        Show full help screen")
+			fmt.Fprintln(config.ErrOut, "        Show full help screen")
 		}
 	}
-	for _, opt := range cmd.config.opts {
+	for _, opt := range cmd.Config.Opts {
 		b := &strings.Builder{}
 		b.WriteString("  ")
-		if opt.short != 0 {
+		if opt.Short != 0 {
 			b.WriteRune('-')
-			b.WriteRune(opt.short)
+			b.WriteRune(opt.Short)
 		}
-		if opt.long != "" {
-			if opt.short != 0 {
+		if opt.Long != "" {
+			if opt.Short != 0 {
 				b.WriteString(", ")
 			}
 			b.WriteString("--")
-			b.WriteString(opt.long)
+			b.WriteString(opt.Long)
 		}
-		if opt.value != "" {
+		if opt.Value != "" {
 			b.WriteRune(' ')
 			b.WriteRune('<')
-			b.WriteString(opt.value)
+			b.WriteString(opt.Value)
 			b.WriteRune('>')
 		}
-		if opt.desc != "" {
-			if opt.short != 0 && opt.long == "" && opt.value == "" {
+		if opt.Desc != "" {
+			if opt.Short != 0 && opt.Long == "" && opt.Value == "" {
 				b.WriteString("    ")
 			} else {
 				b.WriteString("\n        ")
 			}
-			b.WriteString(opt.desc)
+			b.WriteString(opt.Desc)
 		}
-		fmt.Fprintln(errOut, b.String())
+		fmt.Fprintln(config.ErrOut, b.String())
 	}
 }
 
-// listCommands prints the list of commands read from the runfile
+// ListCommands prints the list of commands read from the runfile
 //
-func listCommands() {
-	fmt.Fprintln(errOut, "Commands:")
+func ListCommands() {
+	fmt.Fprintln(config.ErrOut, "Commands:")
 	padLen := 0
-	for _, cmd := range commandList {
-		if len(cmd.name) > padLen {
-			padLen = len(cmd.name)
+	for _, cmd := range config.CommandList {
+		if len(cmd.Name) > padLen {
+			padLen = len(cmd.Name)
 		}
 	}
-	for _, cmd := range commandList {
-		fmt.Fprintf(errOut, "  %s%s    %s\n", cmd.name, strings.Repeat(" ", padLen-len(cmd.name)), cmd.title)
+	for _, cmd := range config.CommandList {
+		fmt.Fprintf(config.ErrOut, "  %s%s    %s\n", cmd.Name, strings.Repeat(" ", padLen-len(cmd.Name)), cmd.Title)
 	}
-	pad := strings.Repeat(" ", len(me)-1)
-	fmt.Fprintf(errOut, "Usage:\n")
-	fmt.Fprintf(errOut, "       %s [-r runfile] help <command>\n", me)
-	fmt.Fprintf(errOut, "       %s (show help for <command>)\n", pad)
-	fmt.Fprintf(errOut, "  or   %s [-r runfile] <command> [option ...]\n", me)
-	fmt.Fprintf(errOut, "       %s (run <command>)\n", pad)
+	pad := strings.Repeat(" ", len(config.Me)-1)
+	fmt.Fprintf(config.ErrOut, "Usage:\n")
+	fmt.Fprintf(config.ErrOut, "       %s [-r runfile] help <command>\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
+	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] <command> [option ...]\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
 }
 
-// runHelp
+// RunHelp shows either the default help or help for the specified command.
 //
-func runHelp(_ *runfile) {
+func RunHelp(_ *Runfile) {
 	cmdName := "help"
 	// Command?
 	//
@@ -381,27 +399,27 @@ func runHelp(_ *runfile) {
 		os.Args = os.Args[1:]
 	}
 	cmdName = strings.ToLower(cmdName)
-	if c, ok := commandMap[cmdName]; ok {
-		c.help()
+	if c, ok := config.CommandMap[cmdName]; ok {
+		c.Help()
 	} else {
 		log.Printf("command not found: %s", cmdName)
-		listCommands()
+		ListCommands()
 	}
 	os.Exit(2)
 }
 
-// runCommand
+// RunCommand executes a command.
 //
-func runCommand(cmd *runCmd) {
+func RunCommand(cmd *RunCmd) {
 	os.Args = evaluateCmdOpts(cmd, os.Args)
 	env := make(map[string]string)
-	for _, name := range cmd.scope.GetExports() {
-		if value, ok := cmd.scope.GetVar(name); ok {
+	for _, name := range cmd.Scope.GetExports() {
+		if value, ok := cmd.Scope.GetVar(name); ok {
 			env[name] = value
 		} else {
 			log.Println("Warning: exported variable not defined: ", name)
 		}
 	}
-	shell := defaultIfEmpty(cmd.config.shell, cmd.scope.attrs[".SHELL"])
-	executeCmdScript(shell, cmd.script, os.Args, env)
+	shell := defaultIfEmpty(cmd.Config.Shell, cmd.Scope.Attrs[".SHELL"])
+	exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
 }

@@ -4,69 +4,57 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
-	"reflect"
-	"runtime"
 	"strings"
-)
 
-type command struct {
-	name   string
-	title  string
-	help   func()
-	run    func()
-	rename func(string) // Rename command to script name in 'main' mode
-}
+	"github.com/tekwizely/run/internal/ast"
+	"github.com/tekwizely/run/internal/config"
+	"github.com/tekwizely/run/internal/lexer"
+	"github.com/tekwizely/run/internal/parser"
+	"github.com/tekwizely/run/internal/runfile"
+)
 
 const (
 	runfileDefault = "Runfile"
 )
 
 var (
-	me          string
 	inputFile   string
 	shebangMode bool
 	mainMode    bool
-	errOut      io.Writer
-	errShell    = errors.New(".SHELL not defined")
-	commandList []*command
-	commandMap  = make(map[string]*command)
 )
 var (
-	enableFnTrace   = false // Show parser/lexer fn call/stack
-	hidePanic       = false // Hide full trace on panics
-	showScriptFiles = false // Show command/sub-shell filenames
+	hidePanic = false // Hide full trace on panics
 )
 
 // showUsage exits with error code 2.
 //
 func showUsage() {
-	pad := strings.Repeat(" ", len(me)-1)
-	fmt.Fprintf(errOut, "Usage:\n")
-	fmt.Fprintf(errOut, "       %s -h | --help\n", me)
-	fmt.Fprintf(errOut, "       %s (show help)\n", pad)
-	fmt.Fprintf(errOut, "  or   %s [-r runfile] list\n", me)
-	fmt.Fprintf(errOut, "       %s (list commands)\n", pad)
-	fmt.Fprintf(errOut, "  or   %s [-r runfile] help <command>\n", me)
-	fmt.Fprintf(errOut, "       %s (show help for <command>)\n", pad)
-	fmt.Fprintf(errOut, "  or   %s [-r runfile] <command> [option ...]\n", me)
-	fmt.Fprintf(errOut, "       %s (run <command>)\n", pad)
-	fmt.Fprintln(errOut, "Options:")
-	fmt.Fprintln(errOut, "  -h, --help")
-	fmt.Fprintln(errOut, "        Show help screen")
-	fmt.Fprintln(errOut, "  -r, --runfile <file>")
-	fmt.Fprintf(errOut, "        Specify runfile (default='%s')\n", runfileDefault)
-	fmt.Fprintln(errOut, "Note:")
-	fmt.Fprintln(errOut, "  Options accept '-' | '--'")
-	fmt.Fprintln(errOut, "  Values can be given as:")
-	fmt.Fprintln(errOut, "        -o value | -o=value")
-	fmt.Fprintln(errOut, "  For boolean options:")
-	fmt.Fprintln(errOut, "        -f | -f=true | -f=false")
-	fmt.Fprintln(errOut, "  Short options cannot be combined")
+	pad := strings.Repeat(" ", len(config.Me)-1)
+	fmt.Fprintf(config.ErrOut, "Usage:\n")
+	fmt.Fprintf(config.ErrOut, "       %s -h | --help\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (show help)\n", pad)
+	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] list\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (list commands)\n", pad)
+	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] help <command>\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
+	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] <command> [option ...]\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
+	fmt.Fprintln(config.ErrOut, "Options:")
+	fmt.Fprintln(config.ErrOut, "  -h, --help")
+	fmt.Fprintln(config.ErrOut, "        Show help screen")
+	fmt.Fprintln(config.ErrOut, "  -r, --runfile <file>")
+	fmt.Fprintf(config.ErrOut, "        Specify runfile (default='%s')\n", runfileDefault)
+	fmt.Fprintln(config.ErrOut, "Note:")
+	fmt.Fprintln(config.ErrOut, "  Options accept '-' | '--'")
+	fmt.Fprintln(config.ErrOut, "  Values can be given as:")
+	fmt.Fprintln(config.ErrOut, "        -o value | -o=value")
+	fmt.Fprintln(config.ErrOut, "  For boolean options:")
+	fmt.Fprintln(config.ErrOut, "        -f | -f=true | -f=false")
+	fmt.Fprintln(config.ErrOut, "  Short options cannot be combined")
 	// flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -74,8 +62,8 @@ func showUsage() {
 // main
 //
 func main() {
-	errOut = os.Stderr
-	me = path.Base(os.Args[0])
+	config.ErrOut = os.Stderr
+	config.Me = path.Base(os.Args[0])
 	// Configure logging
 	//
 	log.SetFlags(0)
@@ -103,8 +91,8 @@ func main() {
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
 	//
 	if shebangMode {
-		me = path.Base(shebangFile) // Script name = executable name for help
-		inputFile = shebangFile     // shebang file = runfile
+		config.Me = path.Base(shebangFile) // Script Name = executable Name for Help
+		inputFile = shebangFile            // shebang file = runfile
 	} else {
 		parseArgs()
 	}
@@ -117,57 +105,57 @@ func main() {
 	}
 	// Parse the file
 	//
-	rfAst := parse(lex(fileBytes))
-	rf := processAST(rfAst)
+	rfAst := parser.Parse(lexer.Lex(fileBytes))
+	rf := ast.ProcessAST(rfAst)
 	// Setup Commands
 	//
-	listCmd := &command{
-		name:   "list",
-		title:  "(builtin) List available commands",
-		help:   func() { listCommands() },
-		run:    func() { listCommands() },
-		rename: func(_ string) {},
+	listCmd := &config.Command{
+		Name:   "list",
+		Title:  "(builtin) List available commands",
+		Help:   func() { runfile.ListCommands() },
+		Run:    func() { runfile.ListCommands() },
+		Rename: func(_ string) {},
 	}
-	helpCmd := &command{
-		name:   "help",
-		title:  "(builtin) Show help for a command",
-		help:   showUsage,
-		run:    func() { runHelp(rf) },
-		rename: func(_ string) {},
+	helpCmd := &config.Command{
+		Name:   "help",
+		Title:  "(builtin) Show Help for a command",
+		Help:   showUsage,
+		Run:    func() { runfile.RunHelp(rf) },
+		Rename: func(_ string) {},
 	}
-	commandMap["list"] = listCmd
-	commandMap["help"] = helpCmd
-	commandList = append(commandList, listCmd, helpCmd)
-	builtinCnt := len(commandList)
-	for _, rfcmd := range rf.cmds {
-		name := strings.ToLower(rfcmd.name) // normalize
-		if _, ok := commandMap[name]; ok {
+	config.CommandMap["list"] = listCmd
+	config.CommandMap["help"] = helpCmd
+	config.CommandList = append(config.CommandList, listCmd, helpCmd)
+	builtinCnt := len(config.CommandList)
+	for _, rfcmd := range rf.Cmds {
+		name := strings.ToLower(rfcmd.Name) // normalize
+		if _, ok := config.CommandMap[name]; ok {
 			panic("Duplicate command: " + name)
 		}
-		cmd := &command{
-			name:   rfcmd.name,
-			title:  rfcmd.Title(),
-			help:   func(c *runCmd) func() { return func() { showCmdHelp(c) } }(rfcmd),
-			run:    func(c *runCmd) func() { return func() { runCommand(c) } }(rfcmd),
-			rename: func(c *runCmd) func(string) { return func(s string) { c.name = s } }(rfcmd),
+		cmd := &config.Command{
+			Name:   rfcmd.Name,
+			Title:  rfcmd.Title(),
+			Help:   func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(rfcmd),
+			Run:    func(c *runfile.RunCmd) func() { return func() { runfile.RunCommand(c) } }(rfcmd),
+			Rename: func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(rfcmd),
 		}
-		commandMap[name] = cmd
-		commandList = append(commandList, cmd)
+		config.CommandMap[name] = cmd
+		config.CommandList = append(config.CommandList, cmd)
 	}
 	// In shebang mode, if only 1 runfile command defined, named "main", default to it directly
 	//
 	mainMode = shebangMode &&
-		len(commandList) == (builtinCnt+1) &&
-		strings.EqualFold(commandList[builtinCnt].name, "main")
+		len(config.CommandList) == (builtinCnt+1) &&
+		strings.EqualFold(config.CommandList[builtinCnt].Name, "main")
 	// Determine which command to run
 	//
 	var cmdName string
 	if mainMode {
 		// In main mode, we defer parsing args to the command
 		//
-		os.Args = os.Args[1:] // Discard 'me'
+		os.Args = os.Args[1:] // Discard 'Me'
 		cmdName = "main"
-		commandList[builtinCnt].rename(me) // Print help as script name
+		config.CommandList[builtinCnt].Rename(config.Me) // Print Help as script Name
 	} else {
 		// If we deferred parsing args, now is the time
 		//
@@ -179,24 +167,24 @@ func main() {
 		} else {
 			// Default = first command in command list
 			//
-			cmdName = commandList[0].name
+			cmdName = config.CommandList[0].Name
 		}
 	}
 	// Run command, if present, else error
 	//
 	cmdName = strings.ToLower(cmdName) // normalize
-	if cmd, ok := commandMap[cmdName]; ok {
-		cmd.run()
+	if cmd, ok := config.CommandMap[cmdName]; ok {
+		cmd.Run()
 	} else {
 		log.Printf("command not found: %s", cmdName)
-		listCommands()
+		runfile.ListCommands()
 		os.Exit(2)
 	}
 }
 
 func parseArgs() {
 	var showHelp bool
-	flag.CommandLine.SetOutput(errOut)
+	flag.CommandLine.SetOutput(config.ErrOut)
 	flag.CommandLine.Usage = showUsage // Invoked if error parsing args
 	flag.BoolVar(&showHelp, "help", false, "")
 	flag.BoolVar(&showHelp, "h", false, "")
@@ -249,13 +237,4 @@ func readFile(path string) ([]byte, error) {
 	// If we get here, we have an error
 	//
 	return nil, err
-}
-
-// traceFn
-//
-func traceFn(msg string, i interface{}) {
-	if enableFnTrace {
-		fnName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
-		log.Println(msg, ":", fnName)
-	}
 }

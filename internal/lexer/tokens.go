@@ -1,4 +1,4 @@
-package main
+package lexer
 
 import (
 	"github.com/tekwizely/go-parsing/lexer"
@@ -7,52 +7,52 @@ import (
 // We define our lexer tokens starting from the pre-defined START token
 //
 const (
-	tokenNewline = lexer.TStart + iota
+	TokenNewline = lexer.TStart + iota
 
-	tokenID
-	tokenDotID
+	TokenID
+	TokenDotID
 
-	tokenColon
-	tokenComma
-	tokenEquals      // '=' | ':='
-	tokenQMarkEquals // ?=
+	TokenColon
+	TokenComma
+	TokenEquals      // '=' | ':='
+	TokenQMarkEquals // ?=
 
-	tokenDQuote
-	tokenDQStringStart
+	TokenDQuote
+	TokenDQStringStart
 
-	tokenSQuote
-	tokenSQStringStart
+	TokenSQuote
+	TokenSQStringStart
 
-	tokenRunes
-	tokenEscapeSequence
+	TokenRunes
+	TokenEscapeSequence
 
-	tokenDollar
-	tokenLBrace
-	tokenRBrace
-	tokenVarRefStart
-	tokenLParen
-	tokenRParen
-	tokenSubCmdStart
+	TokenDollar
+	TokenLBrace
+	TokenRBrace
+	TokenVarRefStart
+	TokenLParen
+	TokenRParen
+	TokenSubCmdStart
 
-	tokenExport
-	tokenCommand
+	TokenExport
+	TokenCommand
 
-	tokenHashLine
+	TokenHashLine
 
-	tokenConfigShell
-	tokenConfigDescLine
-	tokenConfigDescEnd
-	tokenConfigUsage
-	tokenConfigOpt
-	tokenConfigOptName
-	tokenConfigOptShort
-	tokenConfigOptLong
-	tokenConfigOptValue
+	TokenConfigShell
+	TokenConfigDescLine
+	TokenConfigDescEnd
+	TokenConfigUsage
+	TokenConfigOpt
+	TokenConfigOptName
+	TokenConfigOptShort
+	TokenConfigOptLong
+	TokenConfigOptValue
 	tokenConfigOptEnd
-	tokenConfigExport
+	TokenConfigExport
 
-	tokenConfigEnd
+	TokenConfigEnd
 
-	tokenScriptLine
-	tokenScriptEnd
+	TokenScriptLine
+	TokenScriptEnd
 )

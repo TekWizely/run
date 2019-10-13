@@ -1,4 +1,4 @@
-package main
+package lexer
 
 import "github.com/tekwizely/go-parsing/lexer"
 
@@ -10,7 +10,7 @@ func isRune(r rune) runeFn {
 	return func(r_ rune) bool { return r_ == r }
 }
 
-// matchRune
+// matchRune attempts to match the next rune to one specified, returning success or failure.
 //
 func matchRune(l *lexer.Lexer, runes ...rune) bool {
 	if p, ok := tryPeekRune(l); ok {
@@ -24,7 +24,7 @@ func matchRune(l *lexer.Lexer, runes ...rune) bool {
 	return false
 }
 
-// matchRuneOrNone
+// matchRuneOrNone attempts to match the next rune to one specified, returning success regardless.
 //
 func matchRuneOrNone(l *lexer.Lexer, runes ...rune) bool {
 	matchRune(l, runes...)
@@ -43,12 +43,18 @@ func matchZeroOrOne(l *lexer.Lexer, fn runeFn) bool {
 	}
 	return true
 }
+
+// matchZeroOrMore attempts to match zero or more of the specified predicate, ruturning succcess regardless.
+//
 func matchZeroOrMore(l *lexer.Lexer, fn runeFn) bool {
 	for l.CanPeek(1) && fn(l.Peek(1)) {
 		l.Next()
 	}
 	return true
 }
+
+// matchOne attempts to match one or more of the specified predicate, returning success or failure.
+//
 func matchOne(l *lexer.Lexer, fn runeFn) bool {
 	if l.CanPeek(1) && fn(l.Peek(1)) {
 		l.Next()
@@ -56,6 +62,9 @@ func matchOne(l *lexer.Lexer, fn runeFn) bool {
 	}
 	return false
 }
+
+// matchOneOrMore attempts to match one or more of the specified predicate, returning success or failure.
+//
 func matchOneOrMore(l *lexer.Lexer, fn runeFn) bool {
 	b := false
 	for l.CanPeek(1) && fn(l.Peek(1)) {
@@ -85,7 +94,7 @@ func ignoreEmptyLines(l *lexer.Lexer) {
 	}
 }
 
-// ignoreSpace
+// ignoreSpace matches one or more isSpaceOrTab and discards any matches.
 //
 func ignoreSpace(l *lexer.Lexer) {
 	if matchOneOrMore(l, isSpaceOrTab) {
@@ -93,7 +102,7 @@ func ignoreSpace(l *lexer.Lexer) {
 	}
 }
 
-// ignoreEOL
+// ignoreEOL attempts to match newline or EOF, discarding any matches.
 //
 func ignoreEOL(l *lexer.Lexer) {
 	if matchNewlineOrEOF(l) {

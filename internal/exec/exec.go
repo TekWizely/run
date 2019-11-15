@@ -38,9 +38,9 @@ func executeScript(shell string, script []string, args []string, env map[string]
 	}
 	var cmd *exec.Cmd
 
-	// Exec or shell ?
+	// Shebang or env ?
 	//
-	if shell == "exec" {
+	if shell == "shebang" {
 		// Try to make the cmd executable
 		//
 		var stat os.FileInfo

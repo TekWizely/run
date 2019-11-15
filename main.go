@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -95,6 +94,17 @@ func main() {
 		inputFile = shebangFile            // shebang file = runfile
 	} else {
 		parseArgs()
+	}
+	// Verify file exists
+	//
+	if stat, err := os.Stat(inputFile); err == nil {
+		if !stat.Mode().IsRegular() {
+			log.Printf("Error reading file '%s': File not considered 'regular'\n", inputFile)
+			showUsage() // exits
+		}
+	} else {
+		log.Printf("Input file not found: '%s' : Please create the file or specify an alternative", inputFile)
+		showUsage() // exits
 	}
 	// Read file into memory
 	//
@@ -208,30 +218,20 @@ func parseArgs() {
 func readFile(path string) ([]byte, error) {
 	var (
 		err   error
-		stat  os.FileInfo
 		file  *os.File
 		bytes []byte
 	)
 
-	// Stat the file
+	// Open the file
 	//
-	if stat, err = os.Stat(path); err == nil {
-		// Confirm file is regular
+	if file, err = os.Open(path); err == nil {
+		// Close file before we exit
 		//
-		if !stat.Mode().IsRegular() {
-			return nil, errors.New("File not found")
-		}
-		// Open the file
+		defer file.Close()
+		// Read file into memory
 		//
-		if file, err = os.Open(path); err == nil {
-			// Close file before we exit
-			//
-			defer file.Close()
-			// Read file into memory
-			//
-			if bytes, err = ioutil.ReadAll(file); err == nil {
-				return bytes, nil
-			}
+		if bytes, err = ioutil.ReadAll(file); err == nil {
+			return bytes, nil
 		}
 	}
 	// If we get here, we have an error

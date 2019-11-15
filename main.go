@@ -32,21 +32,27 @@ var (
 // showUsage exits with error code 2.
 //
 func showUsage() {
+	runfileOpt := ""
+	if config.EnableRunfileOverride {
+		runfileOpt = "[-r runfile] "
+	}
 	pad := strings.Repeat(" ", len(config.Me)-1)
 	fmt.Fprintf(config.ErrOut, "Usage:\n")
 	fmt.Fprintf(config.ErrOut, "       %s -h | --help\n", config.Me)
 	fmt.Fprintf(config.ErrOut, "       %s (show help)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] list\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "  or   %s %slist\n", config.Me, runfileOpt)
 	fmt.Fprintf(config.ErrOut, "       %s (list commands)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] help <command>\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "  or   %s %shelp <command>\n", config.Me, runfileOpt)
 	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] <command> [option ...]\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "  or   %s %s<command> [option ...]\n", config.Me, runfileOpt)
 	fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
 	fmt.Fprintln(config.ErrOut, "Options:")
 	fmt.Fprintln(config.ErrOut, "  -h, --help")
 	fmt.Fprintln(config.ErrOut, "        Show help screen")
-	fmt.Fprintln(config.ErrOut, "  -r, --runfile <file>")
-	fmt.Fprintf(config.ErrOut, "        Specify runfile (default='%s')\n", runfileDefault)
+	if config.EnableRunfileOverride {
+		fmt.Fprintln(config.ErrOut, "  -r, --runfile <file>")
+		fmt.Fprintf(config.ErrOut, "        Specify runfile (default='%s')\n", runfileDefault)
+	}
 	fmt.Fprintln(config.ErrOut, "Note:")
 	fmt.Fprintln(config.ErrOut, "  Options accept '-' | '--'")
 	fmt.Fprintln(config.ErrOut, "  Values can be given as:")
@@ -92,6 +98,7 @@ func main() {
 	if shebangMode {
 		config.Me = path.Base(shebangFile) // Script Name = executable Name for Help
 		inputFile = shebangFile            // shebang file = runfile
+		config.EnableRunfileOverride = false
 	} else {
 		parseArgs()
 	}
@@ -200,7 +207,7 @@ func parseArgs() {
 	flag.BoolVar(&showHelp, "h", false, "")
 	// No -r/--runfile support in shebang mode
 	//
-	if !shebangMode {
+	if config.EnableRunfileOverride {
 		flag.StringVar(&inputFile, "runfile", runfileDefault, "")
 		flag.StringVar(&inputFile, "r", runfileDefault, "")
 	}

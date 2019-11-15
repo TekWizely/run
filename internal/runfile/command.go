@@ -381,10 +381,14 @@ func ListCommands() {
 		fmt.Fprintf(config.ErrOut, "  %s%s    %s\n", cmd.Name, strings.Repeat(" ", padLen-len(cmd.Name)), cmd.Title)
 	}
 	pad := strings.Repeat(" ", len(config.Me)-1)
+	runfileOpt := ""
+	if config.EnableRunfileOverride {
+		runfileOpt = "[-r runfile] "
+	}
 	fmt.Fprintf(config.ErrOut, "Usage:\n")
-	fmt.Fprintf(config.ErrOut, "       %s [-r runfile] help <command>\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s %shelp <command>\n", config.Me, runfileOpt)
 	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s [-r runfile] <command> [option ...]\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "  or   %s %s<command> [option ...]\n", config.Me, runfileOpt)
 	fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
 }
 

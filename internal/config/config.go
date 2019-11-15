@@ -46,6 +46,10 @@ var EnableFnTrace = false
 //
 var ShowScriptFiles = false
 
+// EnableRunfileOverride indicates if '-r | --runfile' arguments are supported in the current mode.
+//
+var EnableRunfileOverride = true
+
 // TraceFn logs lexer transitions
 //
 func TraceFn(msg string, i interface{}) {

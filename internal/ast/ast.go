@@ -260,9 +260,12 @@ func (a *ScopeVarQAssignment) Apply(s *runfile.Scope) {
 	// Only assign if not already present+non-empty
 	//
 	if val, ok := s.GetVar(a.Name); !ok || len(val) == 0 {
+		// Use the Env value, if present+non-empty, else the assignment value
+		//
 		if val, ok = s.GetEnv(a.Name); !ok || len(val) == 0 {
-			s.PutVar(a.Name, a.Value.Apply(s))
+			val = a.Value.Apply(s)
 		}
+		s.PutVar(a.Name, val)
 	}
 }
 

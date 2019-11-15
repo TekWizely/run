@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-// Command is an abastraction for a command, allowing us to mix runfile commands and custom comments (help, list, etc).
+// Command is an abstraction for a command, allowing us to mix runfile commands and custom comments (help, list, etc).
 //
 type Command struct {
 	Name   string

@@ -57,7 +57,7 @@ func showUsage() {
 	fmt.Fprintln(config.ErrOut, "  Options accept '-' | '--'")
 	fmt.Fprintln(config.ErrOut, "  Values can be given as:")
 	fmt.Fprintln(config.ErrOut, "        -o value | -o=value")
-	fmt.Fprintln(config.ErrOut, "  For boolean options:")
+	fmt.Fprintln(config.ErrOut, "  Flags (booleans) can be given as:")
 	fmt.Fprintln(config.ErrOut, "        -f | -f=true | -f=false")
 	fmt.Fprintln(config.ErrOut, "  Short options cannot be combined")
 	// flag.PrintDefaults()

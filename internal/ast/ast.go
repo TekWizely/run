@@ -4,6 +4,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/tekwizely/run/internal/config"
 	"github.com/tekwizely/run/internal/exec"
 	"github.com/tekwizely/run/internal/runfile"
 )
@@ -333,7 +334,10 @@ func (a *ScopeValueShell) Apply(s *runfile.Scope) string {
 		}
 	}
 	capturedOutput := &strings.Builder{}
-	shell, _ := s.GetAttr(".SHELL")
+	shell, ok := s.GetAttr(".SHELL")
+	if !ok || len(shell) == 0 {
+		shell = config.DefaultShell
+	}
 	exec.ExecuteSubCommand(shell, cmd, env, capturedOutput)
 	result := capturedOutput.String()
 

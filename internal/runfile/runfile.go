@@ -1,5 +1,7 @@
 package runfile
 
+import "github.com/tekwizely/run/internal/config"
+
 // Runfile stores the processed file, ready to run.
 //
 type Runfile struct {
@@ -14,13 +16,6 @@ func NewRunfile() *Runfile {
 		Scope: NewScope(),
 		Cmds:  []*RunCmd{},
 	}
-}
-
-// DefaultShell looks up .SHELL
-//
-func (r *Runfile) DefaultShell() (string, bool) {
-	shell, ok := r.Scope.Attrs[".SHELL"]
-	return shell, ok && len(shell) > 0
 }
 
 // RunCmdOpt captures an OPTION
@@ -63,7 +58,14 @@ func (c *RunCmd) Title() string {
 // Shell fetches the shell for the command, defaulting to the global '.SHELL'.
 //
 func (c *RunCmd) Shell() string {
-	return defaultIfEmpty(c.Config.Shell, c.Scope.Attrs[".SHELL"])
+	var shell string
+	if shell = c.Config.Shell; len(shell) == 0 {
+		var ok bool
+		if shell, ok = c.Scope.Attrs[".SHELL"]; !ok || len(shell) == 0 {
+			shell = config.DefaultShell
+		}
+	}
+	return shell
 }
 
 // EnableHelp returns whether or not a help screen should be shown for a command.

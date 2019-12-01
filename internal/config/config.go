@@ -18,6 +18,10 @@ type Command struct {
 	Rename func(string) // Rename Command to script Name in 'main' mode
 }
 
+// DefaultShell specifies which shell to use for command scripts and sub-shells if none explicitly defined.
+//
+const DefaultShell = "sh"
+
 // Me stores the script name we consider the runfile to be running as.
 //
 var Me string

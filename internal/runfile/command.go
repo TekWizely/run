@@ -424,6 +424,6 @@ func RunCommand(cmd *RunCmd) {
 			log.Println("Warning: exported variable not defined: ", name)
 		}
 	}
-	shell := defaultIfEmpty(cmd.Config.Shell, cmd.Scope.Attrs[".SHELL"])
+	shell := cmd.Shell()
 	exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
 }

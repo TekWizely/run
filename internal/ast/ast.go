@@ -169,7 +169,10 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	// Config
 	//
 	cmd.Config = &runfile.RunCmdConfig{}
+	// .SHELL
+	//
 	cmd.Config.Shell = a.Config.Shell
+	cmd.Scope.PutAttr(".SHELL", cmd.Shell())
 	// Config Desc
 	//
 	for _, desc := range a.Config.Desc {

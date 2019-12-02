@@ -270,11 +270,16 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
 // ShowCmdHelp shows cmd, desc, usage and opts
 //
 func ShowCmdHelp(cmd *RunCmd) {
+	var shell = ""
+	if config.ShowCmdShells {
+		shell = fmt.Sprintf(" (%s)", cmd.Shell())
+	}
+
 	if !cmd.EnableHelp() {
-		fmt.Fprintf(config.ErrOut, "%s (%s): No help available.\n", cmd.Name, cmd.Shell())
+		fmt.Fprintf(config.ErrOut, "%s%s: No help available.\n", cmd.Name, shell)
 		return
 	}
-	fmt.Fprintf(config.ErrOut, "%s (%s):\n", cmd.Name, cmd.Shell())
+	fmt.Fprintf(config.ErrOut, "%s%s:\n", cmd.Name, shell)
 	// Desc
 	//
 	if len(cmd.Config.Desc) > 0 {
@@ -290,8 +295,12 @@ func ShowCmdHelp(cmd *RunCmd) {
 // ShowCmdUsage show only usage + opts
 //
 func showCmdUsage(cmd *RunCmd) {
+	var shell = ""
+	if config.ShowCmdShells {
+		shell = fmt.Sprintf(" (%s)", cmd.Shell())
+	}
 	if !cmd.EnableHelp() {
-		fmt.Fprintf(config.ErrOut, "%s (%s): No help available.\n", cmd.Name, cmd.Shell())
+		fmt.Fprintf(config.ErrOut, "%s%s: No help available.\n", cmd.Name, shell)
 		return
 	}
 	// Usages

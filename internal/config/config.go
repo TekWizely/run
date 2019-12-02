@@ -50,6 +50,9 @@ var EnableFnTrace = false
 //
 var ShowScriptFiles = false
 
+// ShowCmdShells shows the command shell in the command's help screen
+var ShowCmdShells = false
+
 // EnableRunfileOverride indicates if '-r | --runfile' arguments are supported in the current mode.
 //
 var EnableRunfileOverride = true

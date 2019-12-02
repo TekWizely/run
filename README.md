@@ -92,7 +92,7 @@ We'll see that `hello` shows as an invokable command, but has no other help text
 
 _list commands_
 
-```bash
+```
 $ run list
 
 Commands:
@@ -107,14 +107,14 @@ Commands:
 ```
 
 _show help for hello command_
-```bash
+```
 $ run help hello
 
 hello: No help available.
 ```
 
 _invoke hello command_
-```bash
+```
 $ run hello
 
 Hello, world
@@ -135,7 +135,7 @@ hello:
 
 _output_
 
-```bash
+```
 $ run list
 
 Commands:
@@ -145,7 +145,7 @@ Commands:
   ...
 ```
 
-```bash
+```
 $ run help hello
 
 hello:
@@ -179,7 +179,7 @@ Commands:
   ...
 ```
 
-```bash
+```
 $ run help hello
 
 hello:
@@ -203,7 +203,7 @@ hello:
 
 _output_
 
-```bash
+```
 $ run hello Newman
 
 Hello, Newman
@@ -227,7 +227,7 @@ hello:
 
 _output_
 
-```bash
+```
 $ run help hello
 
 hello:
@@ -240,7 +240,7 @@ Options:
         Name to say hello to
 ```
 
-```bash
+```
 $ run hello --name=Newman
 $ run hello -n Newman
 
@@ -265,7 +265,7 @@ hello:
 
 _output_
 
-```bash
+```
 $ run help hello
 
 hello:
@@ -277,7 +277,7 @@ hello:
 
 ##### Setting a Flag Option to TRUE
 
-```bash
+```
 $ run help --newman=true # true | True | TRUE
 $ run help --newman=1    # 1 | t | T
 $ run help --newman      # Empty value = true
@@ -287,7 +287,7 @@ Hello, Newman
 
 ##### Setting a Flag Option to FALSE
 
-```bash
+```
 $ run help --newman=false # false | False | FALSE
 $ run help --newman=0     # 0 | f | F
 $ run help                # Default value = false
@@ -300,7 +300,7 @@ Hello, World
 
 If your command does not explicitly configure options `-h` or `--help`, then they are automatically registered to display the command's help text.
 
-```bash
+```
 $ run hello --help
 
 hello:
@@ -312,7 +312,7 @@ hello:
 
 Invoking the `help` command with no other arguments shows the help page for the run tool itself.
 
-```bash
+```
 $ run help
 
 Usage:
@@ -343,7 +343,7 @@ Note:
 
 You can specify a runfile using the `-r | --runfile` option:
 
-```bash
+```
 $ run --runfile /path/to/my/file <command>
 ```
 
@@ -371,7 +371,7 @@ By default, variables are local to the runfile and are not part of your command'
 
 For example, you can access them within your command's description:
 
-```bash
+```
 $ run hello -h
 
 hello:
@@ -381,7 +381,7 @@ hello:
 
 But not within your commands script:
 
-```bash
+```
 $ run hello
 
 Hello, world
@@ -403,7 +403,7 @@ hello:
 ```
 
 _output_
-```bash
+```
 $ run hello
 
 Hello, Newman
@@ -424,7 +424,7 @@ hello:
 ```
 
 _help output_
-```bash
+```
 $ run hello -h
 
 hello:
@@ -434,7 +434,7 @@ hello:
 
 _command output_
 
-```bash
+```
 $ run hello
 
 Hello, world
@@ -488,7 +488,7 @@ hello:
 ```
 
 _output_
-```bash
+```
 $ run hello
 
 run: Warning: exported variable not defined:  HELLO
@@ -545,14 +545,14 @@ hello:
 ```
 
 _example with default_
-```bash
+```
 $ run hello
 
 Hello, world
 ```
 
 _example with override_
-```bash
+```
 NAME="Newman" run hello
 
 Hello, Newman
@@ -666,7 +666,7 @@ hello:
 ```
 
 _output_
-```bash
+```
 $ chmod +x runfile.sh
 $ ./runfile.sh hello
 
@@ -678,7 +678,7 @@ Hello, world
 In shebang mode, the runfile filename replaces references to the `run` command:
 
 _shebang mode help example_
-```bash
+```
 $ ./runfile.sh help
 
 Usage:
@@ -695,7 +695,7 @@ Usage:
 
 _shebang mode list example_
 
-```bash
+```
 $ ./runfile.sh list
 
 Commands:
@@ -726,7 +726,7 @@ main:
 In this mode, run's built-in commands are disabled and the `main` command is invoked directly:
 
 _output_
-```bash
+```
 $ ./runfile.sh
 
 Hello, world
@@ -736,7 +736,7 @@ Hello, world
 In main mode, the runfile filename replaces references to `command` name:
 
 _main mode help example_
-```bash
+```
 $ ./runfile.sh --help
 
 runfile.sh:
@@ -749,7 +749,7 @@ runfile.sh:
 
 ### Go Get
 
-```bash
+```
 $ GOPATH=/go/path/ go get github.com/tekwizely/run
 
 $ /go/path/bin/run help

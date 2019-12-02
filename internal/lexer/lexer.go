@@ -454,28 +454,24 @@ func LexDocBlockAttr(_ *LexContext, l *lexer.Lexer) LexFn {
 	return nil
 }
 
-// LexCmdShell lexes a doc block SHELL line
+// LexCmdConfigShell lexes a doc block SHELL line
 //
-func LexCmdShell(_ *LexContext, l *lexer.Lexer) LexFn {
+func LexCmdConfigShell(ctx *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	if matchID(l) {
-		l.EmitToken(TokenID)
-	}
-	ignoreSpace(l)
-	ignoreEOL(l)
-	return nil
+	ctx.PushFn(LexIgnoreNewline)
+	return LexCmdShellName
 }
 
-// LexCmdUsage lexes a doc block USAGE line
+// LexCmdConfigUsage lexes a doc block USAGE line
 //
-func LexCmdUsage(_ *LexContext, l *lexer.Lexer) LexFn {
+func LexCmdConfigUsage(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	return lexDocBlockNQString
 }
 
-// LexCmdOpt matches: name [-l] [--long] [<label>] ["desc"]
+// LexCmdConfigOpt matches: name [-l] [--long] [<label>] ["desc"]
 //
-func LexCmdOpt(_ *LexContext, l *lexer.Lexer) LexFn {
+func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 
 	// ID
@@ -557,14 +553,27 @@ func LexCmdOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	return lexDocBlockNQString
 }
 
-func lexCmdOptEnd(_ *LexContext, l *lexer.Lexer) LexFn {
+func lexCmdConfigOptEnd(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	ignoreEOL(l)
 	l.EmitType(tokenConfigOptEnd)
 	return nil
 }
 
-// LexExport lexes a doc block EXPORT line
+// LexCmdShellName lexes a command's shell
+//
+func LexCmdShellName(_ *LexContext, l *lexer.Lexer) LexFn {
+	if matchID(l) {
+		l.EmitToken(TokenID)
+	} else if l.CanPeek(2) && l.Peek(1) == runeHash && l.Peek(2) == runeBang {
+		l.Next()             // '#'
+		l.Next()             // '!'
+		l.EmitToken(TokenID) // HACK : Not really an ID
+	}
+	return nil
+}
+
+// LexExport lexes a global OR doc block EXPORT line
 //
 func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
@@ -607,6 +616,14 @@ func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 		// No default
 	}
 
+	return nil
+}
+
+// LexIgnoreNewline matches + ignores whitespace + newline
+//
+func LexIgnoreNewline(_ *LexContext, l *lexer.Lexer) LexFn {
+	ignoreSpace(l)
+	ignoreEOL(l)
 	return nil
 }
 

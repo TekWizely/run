@@ -16,6 +16,7 @@ const (
 	// NOTE: You probably want matchNewline()
 	// runeNewline   = '\n'
 	// runeReturn    = '\r'
+	runeBang      = '!'
 	runeHash      = '#'
 	runeDollar    = '$'
 	runeDot       = '.'

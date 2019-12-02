@@ -220,7 +220,7 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 		config = &ast.CmdConfig{}
 	}
 
-	if name, shell, ok = tryMatchCmdHeaderWithShell(p); !ok {
+	if name, shell, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
 		return false
 	}
 	ctx.pushLexFn(ctx.l.Fn)
@@ -271,13 +271,13 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 					panic(fmt.Sprintf("%d:%d: SHELL already defined", t.Line(), t.Column()))
 				}
 				ctx.pushLexFn(ctx.l.Fn)
-				ctx.setLexFn(lexer.LexCmdShell)
+				ctx.setLexFn(lexer.LexCmdConfigShell)
 				shell := expectTokenType(p, lexer.TokenID, "Expecting TokenID")
 				cmdConfig.Shell = shell.Value()
 			case lexer.TokenConfigUsage:
 				p.Next()
 				ctx.pushLexFn(ctx.l.Fn)
-				ctx.setLexFn(lexer.LexCmdUsage)
+				ctx.setLexFn(lexer.LexCmdConfigUsage)
 				usage := expectDocNQString(ctx, p)
 				cmdConfig.Usages = append(cmdConfig.Usages, usage)
 				p.Clear()
@@ -285,7 +285,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				p.Next()
 				opt := &ast.CmdOpt{}
 				ctx.pushLexFn(ctx.l.Fn)
-				ctx.setLexFn(lexer.LexCmdOpt)
+				ctx.setLexFn(lexer.LexCmdConfigOpt)
 				opt.Name = expectTokenType(p, lexer.TokenConfigOptName, "Expecting TokenConfigOptName").Value()
 				if tryPeekType(p, lexer.TokenConfigOptShort) {
 					opt.Short = []rune(p.Next().Value())[0]
@@ -571,7 +571,7 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList
 
 // tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
-func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
+func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, bool) {
 	expectCommand := tryPeekType(p, lexer.TokenCommand)
 	if expectCommand {
 		expectTokenType(p, lexer.TokenCommand, "Expecting TokenCommand")
@@ -592,6 +592,8 @@ func tryMatchCmdHeaderWithShell(p *parser.Parser) (string, string, bool) {
 	shell := ""
 	if tryPeekType(p, lexer.TokenLParen) {
 		expectTokenType(p, lexer.TokenLParen, "Expecting TokenLParen ('(')")
+		ctx.pushLexFn(ctx.l.Fn)
+		ctx.setLexFn(lexer.LexCmdShellName)
 		shell = expectTokenType(p, lexer.TokenID, "Expecting shell name").Value()
 		expectTokenType(p, lexer.TokenRParen, "Expecting TokenRParen (')')")
 	}

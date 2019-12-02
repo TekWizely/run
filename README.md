@@ -1,4 +1,4 @@
-# Run
+# Run: Easily manage and invoke small scripts and wrappers
 
 <!--- These are examples. See https://shields.io for others or to customize this set of shields. You might want to include dependencies, project status and licence info here --->
 ![GitHub repo size](https://img.shields.io/github/repo-size/TekWizely/run)
@@ -7,28 +7,84 @@
 ![GitHub forks](https://img.shields.io/github/forks/TekWizely/run?style=social)
 ![Twitter Follow](https://img.shields.io/twitter/follow/TekWizely?style=social)
 
-Like to use `make` to manage your scripts? Here's a dedicated tool for that!
+Do you find yourself using tools like `make` to manage non build-related scripts?
 
-Run aims to be a better tool for managing multiple scripts within a single file.
+Build tools are great, but they are not optimized for general script management.
 
-## Runfile
+Run aims to be better at managing small scripts and wrappers, while incorporating a familiar make-like syntax.
+
+
+#### Runfile
+
 Where make has the ubiquitous Makefile, run has the cleverly-named `"Runfile"`
 
 By default, run will look for a file named `"Runfile"` in the current directory, exiting with error if not found.
 
 Read below for details on specifying alternative runfiles, as well as other special modes you might find useful.
 
+#### Commands
+
+In place of make's targets, runfiles contain `'commands'`.
+
+Similar to make, a command's label is used to invoke it from the command-line.
+
+#### Scripts
+
+Instead of recipes, each runfile command contains a `'script'` which is executed when the command is invoked.
+
+You might be used to make's (default) behavior of executing each line of a recipe in a separate sub-shell.
+
+In run, the entire script is executed within a single sub-shell.
+
+
+#### TOC
+
+- [Examples](#examples)
+- [Special Modes](#special-modes)
+- [Installing](#installing)
+- [Contributing](#contributing)
+- [Contact](#contact)
+- [License](#license)
+- [Just Looking for Bash Arg Parsing?](#just-looking-for-bash-arg-parsing)
+
+
 -----------
 ## Examples
 
-### Simple Command Definitions
+ - [Simple Command Definitions](#simple-command-definitions)
+ - [Simple Title Definitions](#simple-title-definitions)
+ - [Title & Description](#title--description)
+ - [Arguments](#arguments)
+ - [Command-Line Options](#command-line-options)
+   - [Boolean (Flag) Options](#boolean-flag-options)
+   - [Getting `-h` & `--help` For Free](#getting--h----help-for-free)
+ - [Run Tool Help](#run-tool-help)
+ - [Using an Alternative Runfile](#using-an-alternative-runfile)
+ - [Runfile Variables](#runfile-variables)
+   - [Local By Default](#local-by-default)
+   - [Exporting Variables](#exporting-variables)
+     - [Per-Command Variables](#per-command-variables)
+     - [Exporting Previously-Defined Variables](#exporting-previously-defined-variables)
+     - [Pre-Declaring Exports](#pre-declaring-exports)
+       - [Forgetting To Define An Exported Variable](#forgetting-to-define-an-exported-variable)
+   - [Referencing Other Variables](#referencing-other-variables)
+   - [Shell Substitution](#shell-substitution)
+   - [Conditional Assignment](#conditional-assignment)
+ - [Script Shells](#script-shells)
+   - [Per-Command Shell Config](#per-command-shell-config)
+   - [Global Default Shell Config](#global-default-shell-config)
+   - [Other Executors](#other-executors)
+     - [Python Example](#python-example)
+   - [Custom `#!` Support](#custom--support)
+     - [C Example](#c-example)
 
-Here's a simple `hello world` example.
+------------------------------
+### Simple Command Definitions
 
 _Runfile_
 
 ```
-hello (bash):
+hello:
   echo "Hello, world"
 ```
 
@@ -54,7 +110,7 @@ _show help for hello command_
 ```bash
 $ run help hello
 
-hello (bash): No help available.
+hello: No help available.
 ```
 
 _invoke hello command_
@@ -73,7 +129,7 @@ _Runfile_
 
 ```
 ## Hello world example.
-hello (bash):
+hello:
   echo "Hello, world"
 ```
 
@@ -92,7 +148,7 @@ Commands:
 ```bash
 $ run help hello
 
-hello (bash):
+hello:
   Hello world example.
 ```
 
@@ -107,14 +163,13 @@ _Runfile_
 ##
 # Hello world example.
 # Prints "Hello, world".
-# NOTE: Requires bash.
-hello (bash):
+hello:
   echo "Hello, world"
 ```
 
 _output_
 
-```bash
+```shell
 $ run list
 
 Commands:
@@ -127,10 +182,9 @@ Commands:
 ```bash
 $ run help hello
 
-hello (bash):
+hello:
   Hello world example.
   Prints "Hello, world".
-  NOTE: Requires bash.
 ```
 
 -------------
@@ -143,7 +197,7 @@ _Runfile_
 ```
 ##
 # Hello world example.
-hello (bash):
+hello:
   echo "Hello, ${1}"
 ```
 
@@ -167,7 +221,7 @@ _Runfile_
 # Hello world example.
 # Prints "Hello, <name>".
 # OPTION NAME -n,--name <name> Name to say hello to
-hello (bash):
+hello:
   echo "Hello, ${NAME}"
 ```
 
@@ -176,7 +230,7 @@ _output_
 ```bash
 $ run help hello
 
-hello (bash):
+hello:
   Hello world example.
   Prints "Hello, <name>".
 Options:
@@ -203,7 +257,7 @@ _Runfile_
 ##
 # Hello world example.
 # OPTION NEWMAN --newman Say hello to Newman
-hello (bash):
+hello:
   NAME="World"
   [[ -n "${NEWMAN}" ]] && NAME="Newman"
   echo "Hello, ${NAME}"
@@ -214,7 +268,7 @@ _output_
 ```bash
 $ run help hello
 
-hello (bash):
+hello:
   Hello world example.
   ...
   --newman
@@ -243,12 +297,13 @@ Hello, World
 ```
 
 #### Getting `-h` & `--help` For Free
+
 If your command does not explicitly configure options `-h` or `--help`, then they are automatically registered to display the command's help text.
 
 ```bash
 $ run hello --help
 
-hello (bash):
+hello:
   ...
 ```
 
@@ -285,6 +340,7 @@ Note:
 
 ------------------------------------
 ### Using an Alternative Runfile
+
 You can specify a runfile using the `-r | --runfile` option:
 
 ```bash
@@ -305,11 +361,12 @@ NAME := "Newman"
 ##
 # Hello world example.
 # Tries to print "Hello, ${NAME}"
-hello (bash):
+hello:
   echo "Hello, ${NAME:-world}"
 ```
 
 #### Local By Default
+
 By default, variables are local to the runfile and are not part of your command's environment.
 
 For example, you can access them within your command's description:
@@ -317,7 +374,7 @@ For example, you can access them within your command's description:
 ```bash
 $ run hello -h
 
-hello (bash):
+hello:
   Hello world example.
   Tries to print "Hello, Newman"
 ```
@@ -331,6 +388,7 @@ Hello, world
 ```
 
 #### Exporting Variables
+
 To make a variable available to your command script, you need to `export` it:
 
 _Runfile_
@@ -340,7 +398,7 @@ EXPORT NAME := "Newman"
 ##
 # Hello world example.
 # Tries to print "Hello, ${NAME}"
-hello (bash):
+hello:
   echo "Hello, ${NAME:-world}"
 ```
 
@@ -352,6 +410,7 @@ Hello, Newman
 ```
 
 ##### Per-Command Variables
+
 You can create variables on a per-command basis:
 
 _Runfile_
@@ -360,7 +419,7 @@ _Runfile_
 # Hello world example.
 # Prints "Hello, ${NAME}"
 # EXPORT NAME := "world"
-hello (bash):
+hello:
   echo "Hello, ${NAME}"
 ```
 
@@ -368,7 +427,7 @@ _help output_
 ```bash
 $ run hello -h
 
-hello (bash):
+hello:
   Hello world example.
   Prints "Hello, world"
 ```
@@ -382,6 +441,7 @@ Hello, world
 ```
 
 ##### Exporting Previously-Defined Variables
+
 You can export previously-defined variables by name:
 
 _Runfile_
@@ -392,7 +452,7 @@ NAME  := "world"
 ##
 # Hello world example.
 # EXPORT HELLO, NAME
-hello (bash):
+hello:
   echo "${HELLO}, ${NAME}"
 ```
 
@@ -408,7 +468,7 @@ NAME  := "world"
 
 ##
 # Hello world example.
-hello (bash):
+hello:
   echo "${HELLO}, ${NAME}"
 ```
 
@@ -423,7 +483,7 @@ NAME := "world"
 
 ##
 # Hello world example.
-hello (bash):
+hello:
   echo "Hello, ${NAME}"
 ```
 
@@ -433,6 +493,40 @@ $ run hello
 
 run: Warning: exported variable not defined:  HELLO
 Hello, world
+```
+
+#### Referencing Other Variables
+
+You can reference other variables within your assignment:
+
+_Runfile_
+```
+SALUTATION := "Hello"
+NAME       := "Newman"
+
+EXPORT MESSAGE := "${SALUTATION}, ${NAME}"
+
+##
+# Hello world example.
+hello:
+  echo "${MESSAGE}"
+```
+
+#### Shell Substitution
+
+You can invoke sub-shells and capture their output within your assignment:
+
+_Runfile_
+```
+SALUTATION := "Hello"
+NAME       := "$( echo 'Newman )" # Trivial example
+
+EXPORT MESSAGE := "${SALUTATION}, ${NAME}"
+
+##
+# Hello world example.
+hello:
+  echo "${MESSAGE}"
 ```
 
 #### Conditional Assignment
@@ -446,7 +540,7 @@ EXPORT NAME ?= "world"
 
 ##
 # Hello world example.
-hello (bash):
+hello:
   echo "Hello, ${NAME}"
 ```
 
@@ -464,59 +558,78 @@ NAME="Newman" run hello
 Hello, Newman
 ```
 
-## Script Targets
-All of the examples use `bash` as the script target, but you can use other targets
+-----------------
+### Script Shells
 
-### Python Example
+Run's default shell is `'sh'`, but you can specify other shells.
+
+All of the standard shells should work.
+
+#### Per-Command Shell Config
+
+Each command can specify its own shell:
+```
+##
+# Hello world example.
+# NOTE: Requires ${.SHELL}
+hello (bash):
+  echo "Hello, world"
+```
+
+#### Global Default Shell Config
+
+You can set the default shell for the entire runfile:
 
 _Runfile_
 ```
-## Hello world python example
+# Set default shell for all actions
+.SHELL = bash
+
+##
+# Hello world example.
+# NOTE: Requires ${.SHELL}
+hello:
+  echo "Hello, world"
+```
+
+#### Other Executors
+
+You can even specify executors that are not technically shells.
+
+##### Python Example
+
+_Runfile_
+```
+## Hello world python example.
 hello (python):
-	print("Hello, world")
+	print("Hello, world from python!")
 ```
 
-_output_
-```bash
-$ run list
+##### Script Execution : env
 
-Commands:
-  ...
-  hello    Hello world python example
-  ...
-```
-```bash
-$ run hello -h
-
-hello (python):
-  Hello world python example
-```
-```bash
-$ run hello
-
-Hello, world
-```
-
-### Other Targets
-Run executes scripts using the following pattern:
+Run executes scripts using the following command:
 
 ```
-/usr/bin/env $TARGET $TMP_SCRIPT_FILE [ARG ...]
+/usr/bin/env $SHELL $TMP_SCRIPT_FILE [ARG ...]
 ```
 
-Any target that that is on the `PATH`, can be invoked via `env`, and takes a filename as its first argument should work.
+Any executor that is on the `PATH`, can be invoked via `env`, and takes a filename as its first argument should work.
 
-### Custom `#!` Support
-If you want a custom `#!` in your script, you can use the `shebang` target.
-Here's an example of running a `c` program as a shell script:
+#### Custom `#!` Support
+
+If you want a custom `#!` line in your script, you can use the `#!` executor.
+
+##### C Example
+
+Here's an example of running a `c` program from a shell script using a custom `#!` header:
 
 _Runfile_
 ```
 ##
-# Hello example using c with shebang target
-# NOTE: Requires bash + gcc
-hello(shebang):
-  #!/usr/bin/env bash
+# Hello world c example using #! executor.
+# NOTE: Requires gcc
+hello (#!):
+  #!/usr/bin/env sh
   sed -n -e '7,$p' < "$0" | gcc -x c -o "$0.$$.out" -
   $0.$$.out "$0" "$@"
   STATUS=$?
@@ -526,26 +639,16 @@ hello(shebang):
 
   int main(int argc, char **argv)
   {
-    printf("Hello, world\n");
+    printf("Hello, world from c!\n");
     return 0;
   }
 ```
 
-_output_
-```bash
-$ run hello -h
+##### Script Execution: Direct
 
-hello (shebang):
-  Hello example using c with shebang target
-  NOTE: Requires bash + gcc
-```
+*NOTE:* The `#!` executor does not use `/user/bin/env` to invoke your script.  Instead it attempts to make the temporary script file executable then invoke it directly.
 
-```bash
-$ run hello
-
-Hello, world
-```
-
+----------------
 ## Special Modes
 
 ### Shebang Mode
@@ -557,7 +660,7 @@ _runfile.sh_
 #!/usr/bin/env run shebang
 
 ## Hello example using shebang mode
-hello(bash):
+hello:
   echo "Hello, world"
 
 ```
@@ -606,6 +709,7 @@ Usage:
                  (run <command>)
 ```
 
+-------------
 ### Main Mode
 
 In main mode you use an executable runfile that consists of a single command, aptly named `main`:
@@ -615,7 +719,7 @@ _runfile.sh_
 #!/usr/bin/env run shebang
 
 ## Hello example using main mode
-main(bash):
+main:
   echo "Hello, world"
 ```
 
@@ -635,11 +739,12 @@ _main mode help example_
 ```bash
 $ ./runfile.sh --help
 
-runfile.sh (bash):
+runfile.sh:
   Hello example using main mode
 
 ```
 
+-------------
 ## Installing
 
 ### Go Get
@@ -657,7 +762,9 @@ See the [Releases](https://github.com/TekWizely/run/releases) page as some relea
 ### Package Managers
 I hope to have `brew`, `deb` and other packages available soon.
 
+---------------
 ## Contributing
+
 To contribute to Run, follow these steps:
 
 1. Fork this repository.
@@ -668,11 +775,19 @@ To contribute to Run, follow these steps:
 
 Alternatively see the GitHub documentation on [creating a pull request](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request).
 
+----------
 ## Contact
 
 If you want to contact me you can reach me at TekWize.ly@gmail.com.
 
-
+----------
 ## License
 
 The `tekwizely/run` project is released under the [MIT](https://opensource.org/licenses/MIT) License.  See `LICENSE` file.
+
+-------------------------------------
+## Just Looking for Bash Arg Parsing?
+
+If you happened to find this project on your quest for bash-specific arg parsing solutions, I found this fantastic S/O post with many great suggestions:
+
+* [Parsing Command-Line Arguments in Bash (S/O)](https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash)

@@ -23,11 +23,10 @@ pkgver() {
 }
 
 build(){
-  export GOPATH="${srcdir}/gopath"
   cd "${srcdir}/run"
   go build \
     -trimpath \
-    -ldflags "-extldflags $LDFLAGS" 
+    -ldflags "-extldflags $LDFLAGS" .
 }
 
 package(){

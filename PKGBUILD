@@ -4,10 +4,13 @@ pkgname=run
 pkgver=0.1
 pkgrel=1
 pkgdesc="Easily manage and invoke small scripts and wrappers"
-arch=('x86_64')
+arch=('i686' 'x86_64')
 url="https://github.com/TekWizely/run"
 license=('MIT')
-makedepends=('go-pie')
+makedepends=(
+  'go-pie'
+  'git'
+)
 source=("git+https://github.com/TekWizely/run.git")
 sha256sums=('SKIP')
 
@@ -20,6 +23,7 @@ pkgver() {
 }
 
 build(){
+  export GOPATH="${srcdir}/gopath"
   cd "${srcdir}/run"
   go build \
     -trimpath \

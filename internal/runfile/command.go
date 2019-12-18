@@ -185,6 +185,11 @@ func (a *boolOpt) IsBoolFlag() bool {
 // evaluateCmdOpts
 //
 func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
+	// If no options defined, pass all args through to command script
+	//
+	if len(cmd.Config.Opts) == 0 {
+		return args
+	}
 	flags := flag.NewFlagSet(cmd.Name, flag.ExitOnError)
 	// Invoked if error parsing arguments.
 	//

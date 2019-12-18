@@ -686,7 +686,7 @@ func lexCmdScriptLine(_ *LexContext, l *lexer.Lexer) LexFn {
 	// We have a script line
 	// Consume the full line, including eol/eof
 	//
-	for !matchNewline(l) {
+	for !matchNewlineOrEOF(l) {
 		l.Next()
 	}
 	l.EmitToken(TokenScriptLine)

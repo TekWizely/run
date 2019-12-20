@@ -569,7 +569,7 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList
 	panic("expecting TokenDoubleQuote ('\"')")
 }
 
-// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] CMD_ID ( '(' ID ')' )? ( ':' | '{' ) ]
+// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
 func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, bool) {
 	expectCommand := tryPeekType(p, lexer.TokenCommand)

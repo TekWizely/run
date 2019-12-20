@@ -26,6 +26,14 @@ const DefaultShell = "sh"
 //
 var Me string
 
+// ShebangMode treats the Runfile as the executable
+//
+var ShebangMode bool
+
+// MainMode extends ShebangMode by auto-invoking the main command
+//
+var MainMode bool
+
 // ErrOut is where logs and errors are sent to (generally stderr).
 //
 var ErrOut io.Writer

@@ -52,6 +52,7 @@ In run, the entire script is executed within a single sub-shell.
 ## Examples
 
  - [Simple Command Definitions](#simple-command-definitions)
+   - [Naming Commands](#naming-commands)
  - [Simple Title Definitions](#simple-title-definitions)
  - [Title & Description](#title--description)
  - [Arguments](#arguments)
@@ -119,6 +120,87 @@ _invoke hello command_
 $ run hello
 
 Hello, world
+```
+
+#### Naming Commands
+
+Run accepts the following pattern for command names:
+
+```
+alpha ::= 'a' .. 'z' | 'A' .. 'Z'
+digit ::= '0' .. '9'
+
+CMD_NAME ::= [ alpha | '_' ] ( [ alpha | digit | '_' | '-' ] )*
+```
+
+Some examples:
+* `hello`
+* `hello_world`
+* `hello-world`
+* `HelloWorld`
+
+##### Case Sensitivity
+
+###### Invoking Commands
+
+When invoking commands, run treats the command name as case-insensitive:
+
+_Runfile_
+```
+Hello-World:
+  echo "Hello, world"
+```
+
+_output_
+```
+$ run Hello-World
+$ run Hello-world
+$ run hello-world
+
+Hello, world
+```
+
+###### Displaying Help
+
+When displaying help text, run treats the command name as case-sensitive, displaying the command name as it is defined:
+
+_list commands_
+
+```
+$ run list
+
+Commands:
+  ..
+  Hello-World
+  ...
+```
+
+_show help for Hello-World command_
+```
+$ run help Hello-World
+
+Hello-World: No help available.
+```
+
+###### Duplicate Command Names
+
+When registering commands, run treats the command name as case-insensitive, generating an error if a command name is defined multiple times:
+
+_Runfile_
+```
+hello-world:
+  echo "Hello, world"
+
+Hello-World:
+  echo "Hello, world"
+```
+
+_list commands_
+
+```
+$ run list
+
+panic: Duplicate command: hello-world
 ```
 
 ----------------------------

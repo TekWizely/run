@@ -48,6 +48,13 @@ var mainTokens = map[string]token.Type{
 	"EXPORT":  TokenExport,
 }
 
+// isMainToken exists soley to appease go-critic
+//
+func isMainToken(s string) bool {
+	_, ok := mainTokens[s]
+	return ok
+}
+
 // Cmd Config Tokens
 //
 var cmdConfigTokens = map[string]token.Type{
@@ -74,8 +81,12 @@ func isAlphaNumUnder(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
 }
 
-func isAlphaNumDotUnder(r rune) bool {
+func isAlphaNumUnderDot(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || r == '.'
+}
+
+func isAlphaNumUnderDash(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || r == '-'
 }
 
 func isHash(r rune) bool {

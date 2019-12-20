@@ -124,13 +124,16 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 	//
 	case matchDotID(l):
 		l.EmitToken(TokenDotID)
-	// ID
+	// Keyword / ID / DashID
 	//
-	case matchID(l):
+	case matchDashID(l):
 		name := strings.ToUpper(l.PeekToken())
-		if t, ok := mainTokens[name]; ok {
-			l.EmitType(t)
-		} else {
+		switch {
+		case isMainToken(name):
+			l.EmitType(mainTokens[name])
+		case strings.ContainsRune(name, runeDash):
+			l.EmitToken(TokenDashID)
+		default:
 			l.EmitToken(TokenID)
 		}
 	// Unknown
@@ -202,7 +205,7 @@ func LexVarRef(_ *LexContext, l *lexer.Lexer) LexFn {
 	l.EmitType(TokenLBrace)
 	// Variable Name
 	//
-	matchZeroOrMore(l, isAlphaNumDotUnder)
+	matchZeroOrMore(l, isAlphaNumUnderDot)
 	l.EmitToken(TokenRunes) // Could be empty
 	// Close Brace
 	//
@@ -753,4 +756,10 @@ func matchDotID(l *lexer.Lexer) (ok bool) {
 //
 func matchID(l *lexer.Lexer) bool {
 	return matchOne(l, isAlphaUnder) && matchZeroOrMore(l, isAlphaNumUnder)
+}
+
+// matchDashID
+//
+func matchDashID(l *lexer.Lexer) bool {
+	return matchOne(l, isAlphaUnder) && matchZeroOrMore(l, isAlphaNumUnderDash)
 }

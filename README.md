@@ -58,6 +58,7 @@ In run, the entire script is executed within a single sub-shell.
  - [Command-Line Options](#command-line-options)
    - [Boolean (Flag) Options](#boolean-flag-options)
    - [Getting `-h` & `--help` For Free](#getting--h----help-for-free)
+   - [Passing Options Directly Through to the Command Script](#passing-options-directly-through-to-the-command-script)
  - [Run Tool Help](#run-tool-help)
  - [Using an Alternative Runfile](#using-an-alternative-runfile)
  - [Runfile Variables](#runfile-variables)
@@ -169,7 +170,7 @@ hello:
 
 _output_
 
-```shell
+```
 $ run list
 
 Commands:
@@ -298,14 +299,76 @@ Hello, World
 
 #### Getting `-h` & `--help` For Free
 
-If your command does not explicitly configure options `-h` or `--help`, then they are automatically registered to display the command's help text.
+If your command defines one or more options, but does not explicitly configure options `-h` or `--help`, then they are automatically registered to display the command's help text.
 
+_Runfile_
 ```
+##
+# Hello world example.
+# Prints "Hello, world".
+hello:
+  echo "Hello, world"
+```
+
+_output_
+```
+$ run hello -h
 $ run hello --help
 
 hello:
-  ...
+  Hello world example.
+  Prints "Hello, world".
 ```
+
+#### Passing Options Directly Through to the Command Script
+
+If your command does not define any options within the Runfile, then run will pass all command line arguments directly through to the command script.
+
+_Runfile_
+```
+##
+# Echo example
+# Prints the arguments passed into the script
+#
+echo:
+  echo script arguments = "${@}"
+```
+
+_output_
+```
+$ run echo -h --help Hello Newman
+
+script arguments = -h --help Hello Newman
+```
+
+NOTE: As you likely surmised, help options (`-h` & `--help`) are not automatically registered when the command does not define any other options.
+
+##### What if My Command Script DOES Define Options?
+
+If your command script does define one or more options within the Runfile, you can still pass options directly through to the command script, but the syntax is a bit different:
+
+_Runfile_
+```
+##
+# Echo example
+# Prints the arguments passed into the script
+# Use -- to separate run options from script options
+# OPTION ARG -a <arg> Contrived argument
+#
+echo:
+  echo ARG = "${ARG}"
+  echo script arguments = "${@}"
+```
+
+_output_
+```
+$ run echo -a myarg -- -h --help Hello Newman
+
+ARG = myarg
+script arguments = -h --help Hello Newman
+```
+
+Notice the `'--'` in the argument list - Run will stop parsing options when it encounters the `'--'` and pass the rest of the arguments through to the command script.
 
 -----------------
 ### Run Tool Help
@@ -372,7 +435,7 @@ By default, variables are local to the runfile and are not part of your command'
 For example, you can access them within your command's description:
 
 ```
-$ run hello -h
+$ run help hello
 
 hello:
   Hello world example.
@@ -425,7 +488,7 @@ hello:
 
 _help output_
 ```
-$ run hello -h
+$ run help hello
 
 hello:
   Hello world example.
@@ -743,6 +806,12 @@ runfile.sh:
   Hello example using main mode
 
 ```
+
+#### Help options
+
+In main mode, help options (`-h` & `--help`) are automatically configured, even if no other options are defined.
+
+This means you will need to use `--` in order to pass options through to the main script.
 
 -------------
 ## Installing

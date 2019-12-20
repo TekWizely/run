@@ -21,11 +21,7 @@ const (
 )
 
 var (
-	inputFile   string
-	shebangMode bool
-	mainMode    bool
-)
-var (
+	inputFile string
 	hidePanic = false // Hide full trace on panics
 )
 
@@ -91,11 +87,11 @@ func main() {
 			shebangFile = os.Args[1]
 			os.Args = append(os.Args[:1], os.Args[2:]...)
 		}
-		shebangMode = len(shebangFile) > 0 && path.Base(shebangFile) != runfileDefault
+		config.ShebangMode = len(shebangFile) > 0 && path.Base(shebangFile) != runfileDefault
 	}
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
 	//
-	if shebangMode {
+	if config.ShebangMode {
 		config.Me = path.Base(shebangFile) // Script Name = executable Name for Help
 		inputFile = shebangFile            // shebang file = runfile
 		config.EnableRunfileOverride = false
@@ -161,13 +157,13 @@ func main() {
 	}
 	// In shebang mode, if only 1 runfile command defined, named "main", default to it directly
 	//
-	mainMode = shebangMode &&
+	config.MainMode = config.ShebangMode &&
 		len(config.CommandList) == (builtinCnt+1) &&
 		strings.EqualFold(config.CommandList[builtinCnt].Name, "main")
 	// Determine which command to run
 	//
 	var cmdName string
-	if mainMode {
+	if config.MainMode {
 		// In main mode, we defer parsing args to the command
 		//
 		os.Args = os.Args[1:] // Discard 'Me'
@@ -176,7 +172,7 @@ func main() {
 	} else {
 		// If we deferred parsing args, now is the time
 		//
-		if shebangMode {
+		if config.ShebangMode {
 			parseArgs()
 		}
 		if len(os.Args) > 0 {

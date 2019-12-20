@@ -569,7 +569,7 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList
 	panic("expecting TokenDoubleQuote ('\"')")
 }
 
-// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] ID ( '(' ID ')' )? ( ':' | '{' ) ]
+// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
 func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, bool) {
 	expectCommand := tryPeekType(p, lexer.TokenCommand)
@@ -577,7 +577,8 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, st
 		expectTokenType(p, lexer.TokenCommand, "Expecting TokenCommand")
 	} else {
 		expectCommand =
-			tryPeekTypes(p, lexer.TokenID, lexer.TokenColon) ||
+			tryPeekType(p, lexer.TokenDashID) ||
+				tryPeekTypes(p, lexer.TokenID, lexer.TokenColon) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLParen) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLBrace)
 	}
@@ -586,7 +587,12 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, st
 	}
 	// Name
 	//
-	name := expectTokenType(p, lexer.TokenID, "Expecting TokenID").Value()
+	var name string
+	if tryPeekType(p, lexer.TokenDashID) {
+		name = expectTokenType(p, lexer.TokenDashID, "Expecting command name").Value()
+	} else {
+		name = expectTokenType(p, lexer.TokenID, "Expecting command name").Value()
+	}
 	// Shell
 	//
 	shell := ""

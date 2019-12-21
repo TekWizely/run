@@ -1,6 +1,10 @@
 package runfile
 
-import "github.com/tekwizely/run/internal/config"
+import (
+	"strings"
+
+	"github.com/tekwizely/run/internal/config"
+)
 
 // Runfile stores the processed file, ready to run.
 //
@@ -60,9 +64,19 @@ func (c *RunCmd) Title() string {
 func (c *RunCmd) Shell() string {
 	var shell string
 	if shell = c.Config.Shell; len(shell) == 0 {
-		var ok bool
-		if shell, ok = c.Scope.Attrs[".SHELL"]; !ok || len(shell) == 0 {
-			shell = config.DefaultShell
+		// Shebang?
+		//
+		if len(c.Script) > 0 && strings.HasPrefix(c.Script[0], "#!") {
+			shell = "#!"
+		} else {
+			// Global shell configured?
+			//
+			var ok bool
+			if shell, ok = c.Scope.Attrs[".SHELL"]; !ok || len(shell) == 0 {
+				// Use default
+				//
+				shell = config.DefaultShell
+			}
 		}
 	}
 	return shell

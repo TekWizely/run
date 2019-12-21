@@ -762,7 +762,7 @@ Any executor that is on the `PATH`, can be invoked via `env`, and takes a filena
 
 #### Custom `#!` Support
 
-If you want a custom `#!` line in your script, you can use the `#!` executor.
+Run allows you to define custom `#!` lines in your command script:
 
 ##### C Example
 
@@ -773,7 +773,7 @@ _Runfile_
 ##
 # Hello world c example using #! executor.
 # NOTE: Requires gcc
-hello (#!):
+hello:
   #!/usr/bin/env sh
   sed -n -e '7,$p' < "$0" | gcc -x c -o "$0.$$.out" -
   $0.$$.out "$0" "$@"

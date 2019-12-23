@@ -7,7 +7,7 @@ import (
 
 // Version stores the version tag - Should include leading 'v' - Update before tagging new versions.
 //
-var Version = "v0.6.4"
+var Version = "v0.6.5"
 
 // BuildDate is optional and can be set using '-ldflags "-X 'main.BuildDate=..."'.
 //
@@ -23,24 +23,27 @@ var GitSummary string
 func versionString() string {
 	version := strings.Builder{}
 
+	// Version
+	//
 	version.WriteString(Version)
+
+	// BuildDate / GitSummary
+	//
 	if len(BuildDate) > 0 || len(GitSummary) > 0 {
-		// Version
-		//
 		if version.Len() > 0 {
 			version.WriteString(" ")
 		}
 		version.WriteString("(")
 		// Git Summary
 		//
-		if len(BuildDate) > 0 {
+		if len(GitSummary) > 0 {
 			version.WriteString("build=")
 			version.WriteString(GitSummary)
 		}
 		// Build Date
 		//
 		if len(BuildDate) > 0 {
-			if len(BuildDate) > 0 {
+			if len(GitSummary) > 0 {
 				version.WriteString(" ")
 			}
 			version.WriteString("date=")

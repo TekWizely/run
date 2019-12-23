@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -52,8 +51,4 @@ func versionString() string {
 		version.WriteString(")")
 	}
 	return version.String()
-}
-
-func showVersion() {
-	fmt.Println("run", versionString())
 }

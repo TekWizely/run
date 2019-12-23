@@ -60,6 +60,13 @@ func showUsage() {
 	os.Exit(2)
 }
 
+// showVersion exits with error code 0
+//
+func showVersion() {
+	fmt.Println("run", versionString())
+	os.Exit(0)
+}
+
 // main
 //
 func main() {
@@ -81,13 +88,17 @@ func main() {
 	// Shebang?
 	//
 	var shebangFile string
-	if len(os.Args) > 1 && strings.EqualFold(os.Args[1], "shebang") {
-		os.Args = append(os.Args[:1], os.Args[2:]...)
-		if len(os.Args) > 1 {
-			shebangFile = os.Args[1]
+	if len(os.Args) > 1 {
+		if strings.EqualFold(os.Args[1], "shebang") {
 			os.Args = append(os.Args[:1], os.Args[2:]...)
+			if len(os.Args) > 1 {
+				shebangFile = os.Args[1]
+				os.Args = append(os.Args[:1], os.Args[2:]...)
+			}
+			config.ShebangMode = len(shebangFile) > 0 && path.Base(shebangFile) != runfileDefault
+		} else if strings.EqualFold(os.Args[1], "version") {
+			showVersion()
 		}
-		config.ShebangMode = len(shebangFile) > 0 && path.Base(shebangFile) != runfileDefault
 	}
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
 	//

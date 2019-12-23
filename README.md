@@ -910,8 +910,27 @@ $ /go/path/bin/run help
 
 See the [Releases](https://github.com/TekWizely/run/releases) page as some releases may be accompanied by pre-compiled binaries for various platforms.
 
-### Package Managers
-I hope to have `brew`, `deb` and other packages available soon.
+### Brew
+
+A brew core formula is in the works, but in the meantime, I have created a tap tha can be used to install run:
+
+* [TekWizely Homebrew Tap](https://github.com/TekWizely/homebrew-tap)
+
+
+_install run directly_
+```
+$ brew install tekwizely/tap/run
+```
+
+_install tap to track updates_
+```
+$ brew tap tekwizely/tap
+
+$ brew install run
+```
+
+### Other Package Managers
+I hope to have other packages available soon and will update the README as they become available.
 
 ---------------
 ## Contributing

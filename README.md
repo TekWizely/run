@@ -98,8 +98,9 @@ _list commands_
 $ run list
 
 Commands:
-  list     (builtin) List available commands
-  help     (builtin) Show Help for a command
+  list       (builtin) List available commands
+  help       (builtin) Show Help for a command
+  version    (builtin) Show Run version
   hello
   Usage:
          run [-r runfile] help <command>
@@ -222,9 +223,10 @@ _output_
 $ run list
 
 Commands:
-  list     (builtin) List available commands
-  help     (builtin) Show Help for a command
-  hello    Hello world example.
+  list       (builtin) List available commands
+  help       (builtin) Show Help for a command
+  version    (builtin) Show Run version
+  hello      Hello world example.
   ...
 ```
 
@@ -256,9 +258,10 @@ _output_
 $ run list
 
 Commands:
-  list     (builtin) List available commands
-  help     (builtin) Show Help for a command
-  hello    Hello world example.
+  list       (builtin) List available commands
+  help       (builtin) Show Help for a command
+  version    (builtin) Show Run version
+  hello      Hello world example.
   ...
 ```
 
@@ -844,9 +847,10 @@ _shebang mode list example_
 $ ./runfile.sh list
 
 Commands:
-  list     (builtin) List available commands
-  help     (builtin) Show Help for a command
-  hello    Hello example using shebang mode
+  list       (builtin) List available commands
+  help       (builtin) Show Help for a command
+  version    (builtin) Show Run version
+  hello      Hello example using shebang mode
 Usage:
        runfile.sh help <command>
                  (show help for <command>)

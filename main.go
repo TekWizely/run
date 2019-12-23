@@ -136,9 +136,17 @@ func main() {
 		Run:    func() { runfile.RunHelp(rf) },
 		Rename: func(_ string) {},
 	}
+	versionCmd := &config.Command{
+		Name:   "version",
+		Title:  "(builtin) Show Run version",
+		Help:   showVersion,
+		Run:    showVersion,
+		Rename: func(_ string) {},
+	}
 	config.CommandMap["list"] = listCmd
 	config.CommandMap["help"] = helpCmd
-	config.CommandList = append(config.CommandList, listCmd, helpCmd)
+	config.CommandMap["version"] = versionCmd
+	config.CommandList = append(config.CommandList, listCmd, helpCmd, versionCmd)
 	builtinCnt := len(config.CommandList)
 	for _, rfcmd := range rf.Cmds {
 		name := strings.ToLower(rfcmd.Name) // normalize

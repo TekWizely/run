@@ -916,12 +916,37 @@ See the [Releases](https://github.com/TekWizely/run/releases) page as some relea
 
 ### Brew
 
-A brew core formula is in the works, but in the meantime, I have created a tap tha can be used to install run:
+#### Brew Core
 
-* [TekWizely Homebrew Tap](https://github.com/TekWizely/homebrew-tap)
+Run is now available on homebrew core.
 
+Latest available version: `v0.6.5`
 
-_install run directly_
+_install run via brew core_
+```
+$ brew install run
+==> Downloading https://homebrew.bintray.com/bottles/run-0.6.5.mojave.bottle.tar.gz
+==> Downloading from https://akamai.bintray.com/ca/ca616a915230cf04423546409354267e4abc5082f1b8
+######################################################################## 100.0%
+==> Pouring run-0.6.5.mojave.bottle.tar.gz
+🍺  /usr/local/Cellar/run/0.6.5: 5 files, 2.1MB
+
+$ which run
+/usr/local/bin/run
+
+$ run version
+run v0.6.5
+```
+
+#### Brew Tap
+
+In addition to being available in brew core, I have also created a tap to ensure the latest version is always available:
+
+* https://github.com/TekWizely/homebrew-tap
+
+Latest available version: `v0.6.5`
+
+_install run directly from tap_
 ```
 $ brew install tekwizely/tap/run
 ```

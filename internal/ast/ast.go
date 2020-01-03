@@ -13,6 +13,9 @@ import (
 //
 func ProcessAST(ast *Ast) *runfile.Runfile {
 	rf := runfile.NewRunfile()
+	// Seed defaults
+	//
+	rf.Scope.PutAttr(".SHELL", config.DefaultShell)
 	for _, n := range ast.nodes {
 		n.Apply(rf)
 	}

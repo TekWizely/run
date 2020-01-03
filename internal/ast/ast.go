@@ -156,15 +156,15 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	for key, value := range r.Scope.Vars {
 		cmd.Scope.PutVar(key, value)
 	}
-	// Config Environment
-	//
-	for _, varAssignment := range a.Config.Vars {
-		varAssignment.Apply(cmd.Scope)
-	}
 	// Attrs
 	//
 	for k, v := range r.Scope.Attrs {
 		cmd.Scope.PutAttr(k, v)
+	}
+	// Config Environment
+	//
+	for _, varAssignment := range a.Config.Vars {
+		varAssignment.Apply(cmd.Scope)
 	}
 	// Config
 	//

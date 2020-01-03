@@ -140,6 +140,8 @@ func main() {
 		Run:    func() { runfile.ListCommands() },
 		Rename: func(_ string) {},
 	}
+	config.CommandMap["list"] = listCmd
+	config.CommandList = append(config.CommandList, listCmd)
 	helpCmd := &config.Command{
 		Name:   "help",
 		Title:  "(builtin) Show Help for a command",
@@ -147,17 +149,24 @@ func main() {
 		Run:    func() { runfile.RunHelp(rf) },
 		Rename: func(_ string) {},
 	}
+	config.CommandMap["help"] = helpCmd
+	config.CommandList = append(config.CommandList, helpCmd)
+	// In shebang mode, Version registered as 'run-version'
+	//
+	versionName := "version"
+	if config.ShebangMode {
+		versionName = "run-version"
+	}
+
 	versionCmd := &config.Command{
-		Name:   "version",
+		Name:   versionName,
 		Title:  "(builtin) Show Run version",
 		Help:   showVersion,
 		Run:    showVersion,
 		Rename: func(_ string) {},
 	}
-	config.CommandMap["list"] = listCmd
-	config.CommandMap["help"] = helpCmd
-	config.CommandMap["version"] = versionCmd
-	config.CommandList = append(config.CommandList, listCmd, helpCmd, versionCmd)
+	config.CommandMap[versionName] = versionCmd
+	config.CommandList = append(config.CommandList, versionCmd)
 	builtinCnt := len(config.CommandList)
 	for _, rfcmd := range rf.Cmds {
 		name := strings.ToLower(rfcmd.Name) // normalize

@@ -847,15 +847,50 @@ _shebang mode list example_
 $ ./runfile.sh list
 
 Commands:
-  list       (builtin) List available commands
-  help       (builtin) Show Help for a command
-  version    (builtin) Show Run version
-  hello      Hello example using shebang mode
+  list           (builtin) List available commands
+  help           (builtin) Show Help for a command
+  run-version    (builtin) Show Run version
+  hello          Hello example using shebang mode
 Usage:
        runfile.sh help <command>
                  (show help for <command>)
   or   runfile.sh <command> [option ...]
                  (run <command>)
+```
+
+#### Version command name
+
+In shebang mode, the `version` command is renamed to `run-version`.  This enables you to create your own `version` command, while still providing access to run's version info, if needed.
+
+_runfile.sh_
+
+```
+#!/usr/bin/env run shebang
+
+## Show runfile.sh version
+version:
+    echo "runfile.sh v1.2.3"
+
+## Hello example using shebang mode
+hello:
+  echo "Hello, world"
+```
+
+_shebang mode version example_
+```
+$ ./runfile.sh list
+  ...
+  run-version    (builtin) Show Run version
+  version        Show runfile.sh version
+  ...
+
+$ ./runfile.sh version
+
+runfile.sh v1.2.3
+
+$ ./runfile.sh run-version
+
+run v0.0.0
 ```
 
 -------------

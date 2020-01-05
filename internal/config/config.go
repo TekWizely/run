@@ -50,6 +50,13 @@ var CommandList []*Command
 //
 var CommandMap = make(map[string]*Command)
 
+// RunBin holds the absolute path to the run command in use.
+//
+var RunBin string
+
+// RunFile holds the absolute path to the current Runfile.
+var RunFile string
+
 // EnableFnTrace shows parser/lexer fn call/stack
 //
 var EnableFnTrace = false

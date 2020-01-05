@@ -72,6 +72,8 @@ In run, the entire script is executed within a single sub-shell.
    - [Referencing Other Variables](#referencing-other-variables)
    - [Shell Substitution](#shell-substitution)
    - [Conditional Assignment](#conditional-assignment)
+   - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
+     - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
    - [Per-Command Shell Config](#per-command-shell-config)
    - [Global Default Shell Config](#global-default-shell-config)
@@ -705,6 +707,37 @@ NAME="Newman" run hello
 
 Hello, Newman
 ```
+
+#### Invoking Other Commands & Runfiles
+
+##### .RUN / .RUNFILE Attributes
+Run exposes the following attributes:
+
+* `.RUN` - Absolute path of the run binary currently in use
+* `.RUNFILE` - Absolute path of the current Runfile
+
+Your command script can use these to invoke other commands:
+
+_Runfile_
+```
+##
+# Invokes hello
+# EXPORT RUN := ${.RUN}
+# EXPORT RUNFILE := ${.RUNFILE}
+test:
+    "${RUN}" -r "${RUNFILE}" hello
+
+hello:
+    echo "Hello, World"
+```
+
+_output_
+```
+$ run test
+
+Hello, World
+```
+
 
 -----------------
 ### Script Shells

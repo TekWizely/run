@@ -16,6 +16,8 @@ func ProcessAST(ast *Ast) *runfile.Runfile {
 	// Seed defaults
 	//
 	rf.Scope.PutAttr(".SHELL", config.DefaultShell)
+	rf.Scope.PutAttr(".RUN", config.RunBin)
+	rf.Scope.PutAttr(".RUNFILE", config.RunFile)
 	for _, n := range ast.nodes {
 		n.Apply(rf)
 	}

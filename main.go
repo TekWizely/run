@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/tekwizely/run/internal/ast"
@@ -71,7 +72,12 @@ func showVersion() {
 //
 func main() {
 	config.ErrOut = os.Stderr
-	config.Me = path.Base(os.Args[0])
+	if exec, err := os.Executable(); err != nil { // Returns abs path on success
+		config.RunBin = exec
+	} else {
+		config.RunBin = os.Args[0] // Punt to arg[0]
+	}
+	config.Me = path.Base(config.RunBin)
 	// Configure logging
 	//
 	log.SetFlags(0)
@@ -116,13 +122,17 @@ func main() {
 			log.Printf("Error reading file '%s': File not considered 'regular'\n", inputFile)
 			showUsage() // exits
 		}
+		if config.RunFile, err = filepath.Abs(inputFile); err != nil {
+			log.Printf("Error reading file '%s': Cannot determine absolute path\n", inputFile)
+			showUsage() // exits
+		}
 	} else {
 		log.Printf("Input file not found: '%s' : Please create the file or specify an alternative", inputFile)
 		showUsage() // exits
 	}
 	// Read file into memory
 	//
-	fileBytes, err := readFile(inputFile)
+	fileBytes, err := readFile(config.RunFile)
 	if err != nil {
 		log.Printf("Error reading file '%s': %s\n", inputFile, err.Error())
 		showUsage() // exits

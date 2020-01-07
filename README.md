@@ -980,30 +980,25 @@ $ /go/path/bin/run help
 
 ### Pre-Compiled Binaries
 
-See the [Releases](https://github.com/TekWizely/run/releases) page as some releases may be accompanied by pre-compiled binaries for various platforms.
+See the [Releases](https://github.com/TekWizely/run/releases) page as recent releases are accompanied by pre-compiled binaries for various platforms.
+
+##### Not Seeing Binaries For Your Platform?
+
+Run currently uses [goreleaser](https://goreleaser.com/) to generate release assets.
+
+Feel free to [open an issue](https://github.com/TekWizely/run/issues/new) to discuss additional target platforms, or even create a PR against the [.goreleaser.yml](https://github.com/TekWizely/run/blob/master/.goreleaser.yml) configuration.
 
 ### Brew
 
 #### Brew Core
 
-Run is now available on homebrew core.
+Run is now available on homebrew core:
 
-Latest available version: `v0.6.5`
+* https://formulae.brew.sh/formula/run
 
 _install run via brew core_
 ```
 $ brew install run
-==> Downloading https://homebrew.bintray.com/bottles/run-0.6.5.mojave.bottle.tar.gz
-==> Downloading from https://akamai.bintray.com/ca/ca616a915230cf04423546409354267e4abc5082f1b8
-######################################################################## 100.0%
-==> Pouring run-0.6.5.mojave.bottle.tar.gz
-🍺  /usr/local/Cellar/run/0.6.5: 5 files, 2.1MB
-
-$ which run
-/usr/local/bin/run
-
-$ run version
-run v0.6.5
 ```
 
 #### Brew Tap
@@ -1011,8 +1006,6 @@ run v0.6.5
 In addition to being available in brew core, I have also created a tap to ensure the latest version is always available:
 
 * https://github.com/TekWizely/homebrew-tap
-
-Latest available version: `v0.6.5`
 
 _install run directly from tap_
 ```

@@ -1019,6 +1019,18 @@ $ brew tap tekwizely/tap
 $ brew install run
 ```
 
+#### AUR
+
+For Archlinux users, a package is availible on the AUR:
+
+* https://aur.archlinux.org/packages/run-git
+
+_install run from AUR using yay_
+
+```bash
+$ yay -S run-git
+```
+
 ### Other Package Managers
 I hope to have other packages available soon and will update the README as they become available.
 

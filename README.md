@@ -1030,6 +1030,17 @@ _install run from AUR using yay_
 ```bash
 $ yay -S run-git
 ```
+#### NPM / Yarn
+
+NPM & Yarn users can install run via the `@tekwizely/run` package:
+
+* [Run NPM Package Page](https://www.npmjs.com/package/@tekwizely/run)
+
+```
+$ npm i '@tekwizely/run'
+
+$ yarn add '@tekwizely/run'
+```
 
 ### Other Package Managers
 I hope to have other packages available soon and will update the README as they become available.

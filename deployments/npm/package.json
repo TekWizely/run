@@ -1,0 +1,41 @@
+{
+  "name": "@tekwizely/run",
+  "version": "0.0.0",
+  "description": "Easily manage and invoke small scripts and wrappers",
+  "homepage": "https://github.com/TekWizely/run",
+  "license": "MIT",
+  "author": "TekWizely <TekWize.ly+npm@gmail.com>",
+  "main": "index.js",
+  "preferGlobal": true,
+  "keywords": [
+    "Run",
+    "Runfile",
+    "Golang"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TekWizely/run.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TekWizely/run/issues"
+  },
+  "scripts": {
+    "install": "binwrap-install",
+    "prepare": "binwrap-prepare",
+    "test": "binwrap-test",
+    "prepublish": "npm test"
+  },
+  "files": [
+    "bin",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "run": "bin/run"
+  },
+  "dependencies": {
+    "binwrap": "^0.2.2"
+  },
+  "devDependencies": {}
+}

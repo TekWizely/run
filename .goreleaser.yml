@@ -24,11 +24,12 @@ builds:
       - linux
     goarch:
       - amd64
+      - 386
 archives:
   - replacements:
-      darwin: Darwin
-      linux: Linux
-      amd64: x86_64
+      darwin: darwin
+      linux: linux
+      amd64: amd64
 checksum:
   name_template: 'checksums.txt'
 snapshot:

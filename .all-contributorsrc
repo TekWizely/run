@@ -1,0 +1,24 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "chabad360",
+      "name": "chabad360",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/1668291?v=4",
+      "profile": "http://chabad360.me",
+      "contributions": [
+        "doc"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "projectName": "run",
+  "projectOwner": "TekWizely",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "skipCi": true
+}

@@ -1,7 +1,8 @@
 # Run: Easily manage and invoke small scripts and wrappers
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/TekWizely/run)<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)<!-- ALL-CONTRIBUTORS-BADGE:END -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 ![GitHub stars](https://img.shields.io/github/stars/TekWizely/run?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/TekWizely/run?style=social)
 ![Twitter Follow](https://img.shields.io/twitter/follow/TekWizely?style=social)
@@ -1085,6 +1086,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
   <tr>
     <td align="center"><a href="http://chabad360.me"><img src="https://avatars2.githubusercontent.com/u/1668291?v=4" width="100px;" alt=""/><br /><sub><b>chabad360</b></sub></a><br /><a href="https://github.com/TekWizely/run/commits?author=chabad360" title="Documentation">📖</a></td>
     <td align="center"><a href="https://github.com/dawidd6"><img src="https://avatars0.githubusercontent.com/u/9713907?v=4" width="100px;" alt=""/><br /><sub><b>Dawid Dziurla</b></sub></a><br /><a href="#infra-dawidd6" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
+    <td align="center"><a href="https://github.com/rwhogg"><img src="https://avatars3.githubusercontent.com/u/2373856?v=4" width="100px;" alt=""/><br /><sub><b>Bob "Wombat" Hogg</b></sub></a><br /><a href="https://github.com/TekWizely/run/commits?author=rwhogg" title="Documentation">📖</a></td>
   </tr>
 </table>
 

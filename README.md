@@ -1019,7 +1019,7 @@ $ brew install run
 
 #### AUR
 
-For Archlinux users, a package is availible on the AUR:
+For Archlinux users, a package is available on the AUR:
 
 * https://aur.archlinux.org/packages/run-git
 

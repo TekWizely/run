@@ -1083,7 +1083,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="http://chabad360.me"><img src="https://avatars2.githubusercontent.com/u/1668291?v=4" width="100px;" alt=""/><br /><sub><b>chabad360</b></sub></a><br /><a href="https://github.com/TekWizely/run/commits?author=chabad360" title="Documentation">📖</a></td>
+    <td align="center"><a href="http://chabad360.me"><img src="https://avatars2.githubusercontent.com/u/1668291?v=4" width="100px;" alt=""/><br /><sub><b>chabad360</b></sub></a><br /><a href="https://github.com/TekWizely/run/commits?author=chabad360" title="Documentation">📖</a> <a href="#infra-chabad360" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="https://github.com/TekWizely/run/issues?q=author%3Achabad360" title="Bug reports">🐛</a></td>
     <td align="center"><a href="https://github.com/dawidd6"><img src="https://avatars0.githubusercontent.com/u/9713907?v=4" width="100px;" alt=""/><br /><sub><b>Dawid Dziurla</b></sub></a><br /><a href="#infra-dawidd6" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
     <td align="center"><a href="https://github.com/rwhogg"><img src="https://avatars3.githubusercontent.com/u/2373856?v=4" width="100px;" alt=""/><br /><sub><b>Bob "Wombat" Hogg</b></sub></a><br /><a href="https://github.com/TekWizely/run/commits?author=rwhogg" title="Documentation">📖</a></td>
   </tr>

@@ -1,8 +1,7 @@
 # Run: Easily manage and invoke small scripts and wrappers
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/TekWizely/run)<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)<!-- ALL-CONTRIBUTORS-BADGE:END -->
 ![GitHub stars](https://img.shields.io/github/stars/TekWizely/run?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/TekWizely/run?style=social)
 ![Twitter Follow](https://img.shields.io/twitter/follow/TekWizely?style=social)

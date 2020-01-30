@@ -116,7 +116,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 				ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
 				ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
 			} else {
-				panic("expecting assignment values")
+				panic(parseError(p, "expecting assignment values"))
 			}
 		// '?='
 		//
@@ -126,7 +126,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 				ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
 				ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
 			} else {
-				panic("expecting assignment values")
+				panic(parseError(p, "expecting assignment values"))
 			}
 		// ','
 		//
@@ -173,7 +173,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 			ctx.ast.AddScopeNode(&ast.ScopeAttrAssignment{Name: name, Value: valueList})
 			return parseMain
 		}
-		panic("expecting assignment value")
+		panic(parseError(p, "expecting assignment value"))
 	}
 	// Variable Assignment
 	//
@@ -183,7 +183,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 			ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
 			return parseMain
 		}
-		panic("expecting assignment value")
+		panic(parseError(p, "expecting assignment value"))
 	}
 	// Variable QAssignment
 	//
@@ -193,19 +193,14 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 			ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
 			return parseMain
 		}
-		panic("expecting assignment value")
+		panic(parseError(p, "expecting assignment value"))
 	}
 	// Command
 	//
 	if ok = tryMatchCmd(ctx, p, nil); ok {
 		return parseMain
 	}
-	if p.CanPeek(1) {
-		t := p.Peek(1)
-		panic(fmt.Sprintf("%d:%d: Expecting command header", t.Line(), t.Column()))
-	} else {
-		panic("Expecting command header")
-	}
+	panic(parseError(p, "Expecting runfile statement"))
 }
 
 // tryMatchCmd
@@ -229,7 +224,7 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 	}
 	if len(shell) > 0 {
 		if len(config.Shell) > 0 && shell != config.Shell {
-			panic(fmt.Sprintf("Shell '%s' defined in cmd header, shell '%s' defined in attributes", shell, config.Shell))
+			panic(parseError(p, fmt.Sprintf("Shell '%s' defined in cmd header, shell '%s' defined in attributes", shell, config.Shell)))
 		}
 		config.Shell = shell
 	}
@@ -313,7 +308,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 						cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarAssignment{Name: name, Value: valueList})
 						cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
 					} else {
-						panic("expecting assignment value")
+						panic(parseError(p, "expecting assignment value"))
 					}
 				// '?='
 				//
@@ -323,7 +318,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 						cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarQAssignment{Name: name, Value: valueList})
 						cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
 					} else {
-						panic("expecting assignment value")
+						panic(parseError(p, "expecting assignment value"))
 					}
 				// ','
 				//
@@ -507,7 +502,7 @@ func expectSubCmd(ctx *parseContext, p *parser.Parser) *ast.ScopeValueShell {
 			return &ast.ScopeValueShell{Cmd: ast.NewScopeValueNodeList(values)}
 		}
 	}
-	panic("expecting tokenRParen (')')")
+	panic(parseError(p, "expecting tokenRParen (')')"))
 }
 
 // expectSQString
@@ -566,7 +561,7 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList
 			return ast.NewScopeValueNodeList(values)
 		}
 	}
-	panic("expecting TokenDoubleQuote ('\"')")
+	panic(parseError(p, "expecting TokenDoubleQuote ('\"')"))
 }
 
 // tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]

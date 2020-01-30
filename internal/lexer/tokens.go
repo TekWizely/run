@@ -56,4 +56,6 @@ const (
 
 	TokenScriptLine
 	TokenScriptEnd
+
+	TokenUnknownRune
 )

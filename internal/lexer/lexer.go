@@ -139,7 +139,8 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Unknown
 	//
 	default:
-		l.EmitErrorf("unexpected rune '%c'", l.Next())
+		l.Next()
+		l.EmitToken(TokenUnknownRune)
 		return nil
 	}
 

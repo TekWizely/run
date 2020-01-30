@@ -81,7 +81,7 @@ func main() {
 	// Configure logging
 	//
 	log.SetFlags(0)
-	log.SetPrefix(path.Base(os.Args[0]) + ": ")
+	log.SetPrefix(config.Me + ": ")
 	// Capture panics as log messages
 	//
 	if hidePanic {
@@ -110,7 +110,8 @@ func main() {
 	//
 	if config.ShebangMode {
 		config.Me = path.Base(shebangFile) // Script Name = executable Name for Help
-		inputFile = shebangFile            // shebang file = runfile
+		log.SetPrefix(config.Me + ": ")
+		inputFile = shebangFile // shebang file = runfile
 		config.EnableRunfileOverride = false
 	} else {
 		parseArgs()

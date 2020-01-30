@@ -13,12 +13,12 @@ import (
 
 var tempDir string
 
-func executeScript(shell string, script []string, args []string, env map[string]string, prefix string, out io.Writer) {
+func executeScript(shell string, script []string, args []string, env map[string]string, prefix string, out io.Writer) int {
 	if shell == "" {
 		panic(config.ErrShell)
 	}
 	if len(script) == 0 {
-		return
+		return 0
 	}
 	tmpFile, err := tempFile(fmt.Sprintf("%s-%s-*.sh", prefix, shell))
 	if err != nil {
@@ -70,19 +70,32 @@ func executeScript(shell string, script []string, args []string, env map[string]
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
-	_ = cmd.Run()
+	err = cmd.Run()
+	if err == nil {
+		return 0
+	}
+	if exitError, ok := err.(*exec.ExitError); ok {
+		return exitError.ExitCode()
+	}
+	panic(err)
 }
 
 // ExecuteCmdScript executes a command script.
 //
-func ExecuteCmdScript(shell string, script []string, args []string, env map[string]string) {
-	executeScript(shell, script, args, env, "cmd", os.Stdout)
+func ExecuteCmdScript(shell string, script []string, args []string, env map[string]string) int {
+	return executeScript(shell, script, args, env, "cmd", os.Stdout)
 }
 
 // ExecuteSubCommand executes a command substitution.
 //
-func ExecuteSubCommand(shell string, command string, env map[string]string, out io.Writer) {
-	executeScript(shell, []string{command}, []string{}, env, "sub", out)
+func ExecuteSubCommand(shell string, command string, env map[string]string, out io.Writer) int {
+	return executeScript(shell, []string{command}, []string{}, env, "sub", out)
+}
+
+// ExecuteTest will execute the test command against the supplied test string
+//
+func ExecuteTest(shell string, test string, env map[string]string) int {
+	return executeScript(shell, []string{test}, []string{}, env, "test", os.Stdout)
 }
 
 // tempFile

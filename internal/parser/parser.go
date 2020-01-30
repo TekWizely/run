@@ -2,6 +2,7 @@ package parser
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -144,6 +145,20 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		p.Clear()
 		return parseMain
 	}
+	// Assert
+	//
+	if tryPeekType(p, lexer.TokenAssert) {
+		t := p.Next()
+		ctx.pushLexFn(ctx.l.Fn)
+		ctx.setLexFn(lexer.LexAssert)
+		assert := &ast.ScopeAssert{}
+		assert.Line = t.Line()
+		assert.Test = expectTestString(ctx, p)
+		assert.Message = expectNQString(ctx, p)
+		ctx.ast.AddScopeNode(assert)
+		p.Clear()
+		return parseMain
+	}
 	// Doc Line
 	//
 	if tryPeekType(p, lexer.TokenConfigDescLine) {
@@ -255,7 +270,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 		// Desc
 		//
 		for !tryPeekType(p, lexer.TokenConfigDescEnd) {
-			line := expectDocNQString(ctx, p)
+			line := expectNQString(ctx, p)
 			cmdConfig.Desc = append(cmdConfig.Desc, line)
 		}
 		expectTokenType(p, lexer.TokenConfigDescEnd, "Expecting TokenConfigDescEnd")
@@ -278,7 +293,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				p.Next()
 				ctx.pushLexFn(ctx.l.Fn)
 				ctx.setLexFn(lexer.LexCmdConfigUsage)
-				usage := expectDocNQString(ctx, p)
+				usage := expectNQString(ctx, p)
 				cmdConfig.Usages = append(cmdConfig.Usages, usage)
 				p.Clear()
 			case lexer.TokenConfigOpt:
@@ -296,7 +311,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				if tryPeekType(p, lexer.TokenConfigOptValue) {
 					opt.Value = p.Next().Value()
 				}
-				opt.Desc = expectDocNQString(ctx, p)
+				opt.Desc = expectNQString(ctx, p)
 				cmdConfig.Opts = append(cmdConfig.Opts, opt)
 			case lexer.TokenConfigExport:
 				p.Next()
@@ -339,6 +354,16 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				}
 				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 				p.Clear()
+			case lexer.TokenConfigAssert:
+				t = p.Next()
+				ctx.pushLexFn(ctx.l.Fn)
+				ctx.setLexFn(lexer.LexAssert)
+				assert := &ast.CmdAssert{}
+				assert.Line = t.Line()
+				assert.Test = expectTestString(ctx, p)
+				assert.Message = expectNQString(ctx, p)
+				cmdConfig.Asserts = append(cmdConfig.Asserts, assert)
+				p.Clear()
 			default:
 				panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
 			}
@@ -349,9 +374,11 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 	return cmdConfig, cmdConfig != nil
 }
 
-// expectDocNQString - Expects lexer.fn == lexDocBlockNQString BEFORE calling.
+// expectNQString
+// Expects lexer.fn == lexDocBlockNQString BEFORE calling.
+// Expects EOF | EOL.
 //
-func expectDocNQString(ctx *parseContext, p *parser.Parser) ast.ScopeValueNode {
+func expectNQString(ctx *parseContext, p *parser.Parser) ast.ScopeValueNode {
 	values := make([]ast.ScopeValueNode, 0)
 
 	for p.CanPeek(1) && !tryPeekType(p, lexer.TokenNewline) {
@@ -569,6 +596,51 @@ func expectDQString(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList
 	panic(parseError(p, "expecting TokenDoubleQuote ('\"')"))
 }
 
+// expectTestString - Expects lexer.fn == lexTestString BEFORE calling.
+//
+func expectTestString(_ *parseContext, p *parser.Parser) ast.ScopeValueNode {
+	// Values
+	//
+	values := make([]ast.ScopeValueNode, 0)
+	var (
+		endType token.Type
+		endErr  string
+		fn      func(ast.ScopeValueNode) ast.ScopeValueNode
+	)
+	switch {
+	case tryPeekType(p, lexer.TokenBracketStringStart):
+		endType, fn, endErr = lexer.TokenBracketStringEnd, ast.NewScopeBracketString, "Expecting TokenBracketStringEnd"
+	case tryPeekType(p, lexer.TokenDBracketStringStart):
+		endType, fn, endErr = lexer.TokenDBracketStringEnd, ast.NewScopeDBracketString, "Expecting TokenDBracketStringEnd"
+	case tryPeekType(p, lexer.TokenParenStringStart):
+		endType, fn, endErr = lexer.TokenParenStringEnd, ast.NewScopeParenString, "Expecting TokenParenStringEnd"
+	case tryPeekType(p, lexer.TokenDParenStringStart):
+		endType, fn, endErr = lexer.TokenDParenStringEnd, ast.NewScopeDParenString, "Expecting TokenDParenStringEnd"
+	default:
+		panic(parseError(p, "Expecting test string start token"))
+	}
+	p.Next()
+
+	for p.CanPeek(1) {
+		switch p.PeekType(1) {
+		// Character run
+		//
+		case lexer.TokenRunes:
+			values = append(values, &ast.ScopeValueRunes{Value: p.Next().Value()})
+		// Escape char
+		//
+		case lexer.TokenEscapeSequence:
+			values = append(values, &ast.ScopeValueEsc{Seq: p.Next().Value()})
+		// Close string
+		//
+		default:
+			expectTokenType(p, endType, endErr)
+			return fn(ast.NewScopeValueNodeList(values))
+		}
+	}
+	panic(parseError(p, "Expecting test string end token"))
+}
+
 // tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
 func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, bool) {
@@ -672,17 +744,32 @@ func expectTokenType(p *parser.Parser, typ token.Type, msg string) token.Token {
 	if p.CanPeek(1) && p.Peek(1).Type() == typ {
 		return p.Next()
 	}
-	panic(parseError(p, msg))
+	panic(parseError(p, msg)) // Do NOT copy this into a parsePanic method - see parseError for notes
+}
+
+// tokenMsg
+//
+func tokenMsg(t token.Token, msg string) string {
+	return fmt.Sprintf("%d.%d: %s", t.Line(), t.Column(), msg)
+}
+
+// tokenError
+//
+func tokenError(t token.Token, msg string) error {
+	return errors.New(tokenMsg(t, msg))
 }
 
 // parseError
+// NOTE: Do NOT create a parsePanic() method to auto-panic
+//       as it throws off the required return value at the call site.
+//       Just use panic(parseError(p, "error"))
 //
 func parseError(p *parser.Parser, msg string) error {
 	// If a token is available, use it for line/column
 	//
 	if p.CanPeek(1) {
 		t := p.Peek(1)
-		return fmt.Errorf("%d.%d: %s", t.Line(), t.Column(), msg)
+		return tokenError(t, msg)
 	}
 	return fmt.Errorf("<eof>: %s", msg)
 }

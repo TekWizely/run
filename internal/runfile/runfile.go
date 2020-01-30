@@ -32,13 +32,22 @@ type RunCmdOpt struct {
 	Desc  string
 }
 
+// RunCmdAssert captures an assertion for a command.
+//
+type RunCmdAssert struct {
+	Line    int
+	Test    string
+	Message string
+}
+
 // RunCmdConfig captures the configuration for a command.
 //
 type RunCmdConfig struct {
-	Shell  string
-	Desc   []string
-	Usages []string
-	Opts   []*RunCmdOpt
+	Shell   string
+	Desc    []string
+	Usages  []string
+	Opts    []*RunCmdOpt
+	Asserts []*RunCmdAssert
 }
 
 // RunCmd captures a command.

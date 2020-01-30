@@ -63,7 +63,7 @@ var EnableFnTrace = false
 
 // ShowScriptFiles shows Command/sub-shell filenames
 //
-var ShowScriptFiles = false
+var ShowScriptFiles = true
 
 // ShowCmdShells shows the command shell in the command's help screen
 var ShowCmdShells = false

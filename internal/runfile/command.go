@@ -439,6 +439,25 @@ func RunCommand(cmd *RunCmd) {
 			log.Println("Warning: exported variable not defined: ", name)
 		}
 	}
-	shell := cmd.Shell()
+	// Check Asserts - Uses global .SHELL
+	//
+	shell, ok := cmd.Scope.GetAttr(".SHELL")
+	if !ok || len(shell) == 0 {
+		shell = config.DefaultShell
+	}
+	for _, assert := range cmd.Config.Asserts {
+		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
+			// Print message if one configured
+			//
+			if len(assert.Message) > 0 {
+				log.Fatal(assert.Message)
+			} else {
+				log.Fatalf("%d: Assertion failed", assert.Line)
+			}
+		}
+	}
+	// Execute script
+	//
+	shell = cmd.Shell()
 	exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
 }

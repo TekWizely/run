@@ -69,6 +69,7 @@ In run, the entire script is executed within a single sub-shell.
        - [Forgetting To Define An Exported Variable](#forgetting-to-define-an-exported-variable)
    - [Referencing Other Variables](#referencing-other-variables)
    - [Shell Substitution](#shell-substitution)
+   - [Assertions](#assertions)
    - [Conditional Assignment](#conditional-assignment)
    - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
      - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
@@ -676,6 +677,54 @@ EXPORT MESSAGE := "${SALUTATION}, ${NAME}"
 hello:
   echo "${MESSAGE}"
 ```
+
+#### Assertions
+
+Assertions let you check against expected conditions, exiting with an error message when checks fail.
+
+##### Syntax
+
+Assertions have the following syntax:
+
+```
+ASSERT [ <expression> ] <error message>
+```
+
+##### Example
+
+Here's a simple example of using assertions:
+
+_Runfile_
+```
+ASSERT [ -n "${HELLO}" ] Variable 'HELLO' not defined
+
+##
+# ASSERT [ -n "${NAME}" ] Variable 'NAME' not defined
+hello:
+	echo ${HELLO}, ${NAME}
+```
+
+_example_
+```
+$ run hello
+
+run: Variable 'HELLO' not defined
+
+$ HELLO=Hello run hello
+
+run: Variable 'NAME' not defined
+
+$ HELLO=Hello NAME=Newman run hello
+
+Hello, Newman
+```
+
+##### Unix Test Command
+
+Assert uses the standard unix `test` command to evaluate the test condition.  Lear more here:
+
+* https://pubs.opengroup.org/onlinepubs/9699919799/utilities/test.html
+
 
 #### Conditional Assignment
 

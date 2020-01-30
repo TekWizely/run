@@ -234,6 +234,11 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 	// Normalize the script
 	//
 	script = runfile.NormalizeCmdScript(script)
+	// Should not be empty
+	//
+	if len(script) == 0 {
+		panic(parseError(p, "command '"+name+"' contains an empty script."))
+	}
 	ctx.ast.Add(&ast.Cmd{Name: name, Config: config, Script: script})
 	return true
 }

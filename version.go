@@ -6,7 +6,7 @@ import (
 
 // Version stores the version tag - Should include leading 'v' - Update before tagging new versions.
 //
-var Version = "v0.7.0"
+var Version = "v0.7.1"
 
 // BuildDate is optional and can be set using '-ldflags "-X 'main.BuildDate=..."'.
 //

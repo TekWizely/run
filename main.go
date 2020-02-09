@@ -23,7 +23,7 @@ const (
 
 var (
 	inputFile string
-	hidePanic = false // Hide full trace on panics
+	hidePanic = true // Hide full trace on panics
 )
 
 // showUsage exits with error code 2.

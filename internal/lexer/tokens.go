@@ -28,14 +28,28 @@ const (
 	TokenEscapeSequence
 
 	TokenDollar
-	TokenLBrace
-	TokenRBrace
 	TokenVarRefStart
-	TokenLParen
-	TokenRParen
 	TokenSubCmdStart
 
+	TokenLParen
+	TokenRParen
+	TokenLBrace
+	TokenRBrace
+	TokenLBracket
+	TokenRBracket
+
+	TokenParenStringStart  // '( '
+	TokenParenStringEnd    // ' )'
+	TokenDParenStringStart // '(( '
+	TokenDParenStringEnd   // ' ))'
+
+	TokenBracketStringStart  // '[ '
+	TokenBracketStringEnd    // ' ]'
+	TokenDBracketStringStart // '[[ '
+	TokenDBracketStringEnd   // ' ]]'
+
 	TokenExport
+	TokenAssert
 	TokenCommand
 
 	TokenHashLine
@@ -49,13 +63,15 @@ const (
 	TokenConfigOptShort
 	TokenConfigOptLong
 	TokenConfigOptValue
-	tokenConfigOptEnd
 	TokenConfigExport
+	TokenConfigAssert
 
 	TokenConfigEnd
 
 	TokenScriptLine
 	TokenScriptEnd
+
+	TokenEmptyAssertMessage
 
 	TokenUnknownRune
 )

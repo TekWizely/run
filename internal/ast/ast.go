@@ -115,7 +115,7 @@ type ScopeExportList struct {
 	Names []string
 }
 
-// NewScopeExportList1 is a convience method for wrapping a single export.
+// NewScopeExportList1 is a convenience method for wrapping a single export.
 //
 func NewScopeExportList1(name string) *ScopeExportList {
 	return &ScopeExportList{[]string{name}}
@@ -127,6 +127,96 @@ func (a *ScopeExportList) Apply(s *runfile.Scope) {
 	for _, name := range a.Names {
 		s.AddExport(name)
 	}
+}
+
+// ScopeAssert asserts the test, exiting with message on failure.
+//
+type ScopeAssert struct {
+	Line    int
+	Test    ScopeValueNode
+	Message ScopeValueNode
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeAssert) Apply(s *runfile.Scope) {
+	assert := &runfile.Assert{}
+	assert.Line = a.Line
+	assert.Test = a.Test.Apply(s)
+	assert.Message = strings.TrimSpace(a.Message.Apply(s))
+	s.AddAssert(assert)
+}
+
+// ScopeBracketString wraps a bracketed string.
+//
+type ScopeBracketString struct {
+	Value ScopeValueNode
+}
+
+// NewScopeBracketString is a convenience method.
+//
+func NewScopeBracketString(value ScopeValueNode) ScopeValueNode {
+	return &ScopeBracketString{Value: value}
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeBracketString) Apply(s *runfile.Scope) string {
+	return "[ " + a.Value.Apply(s) + " ]"
+}
+
+// ScopeDBracketString wraps a double-bracketed string.
+//
+type ScopeDBracketString struct {
+	Value ScopeValueNode
+}
+
+// NewScopeDBracketString is a convenience method.
+//
+func NewScopeDBracketString(value ScopeValueNode) ScopeValueNode {
+	return &ScopeDBracketString{Value: value}
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeDBracketString) Apply(s *runfile.Scope) string {
+	return "[[ " + a.Value.Apply(s) + " ]]"
+}
+
+// ScopeParenString wraps a paren-string.
+//
+type ScopeParenString struct {
+	Value ScopeValueNode
+}
+
+// NewScopeParenString is a convenience method.
+//
+func NewScopeParenString(value ScopeValueNode) ScopeValueNode {
+	return &ScopeParenString{Value: value}
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeParenString) Apply(s *runfile.Scope) string {
+	return "( " + a.Value.Apply(s) + " )"
+}
+
+// ScopeDParenString wraps a double-paren string.
+//
+type ScopeDParenString struct {
+	Value ScopeValueNode
+}
+
+// NewScopeDParenString is a convenience method.
+//
+func NewScopeDParenString(value ScopeValueNode) ScopeValueNode {
+	return &ScopeDParenString{Value: value}
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeDParenString) Apply(s *runfile.Scope) string {
+	return "(( " + a.Value.Apply(s) + " ))"
 }
 
 // Cmd wraps a parsed command.
@@ -194,6 +284,14 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	for _, opt := range a.Config.Opts {
 		cmd.Config.Opts = append(cmd.Config.Opts, opt.Apply(cmd))
 	}
+	// Asserts - Global first, then Command
+	//
+	for _, assert := range r.Scope.Asserts {
+		cmd.Scope.AddAssert(assert)
+	}
+	for _, assert := range a.Config.Asserts {
+		cmd.Scope.AddAssert(assert.Apply(cmd.Scope))
+	}
 	r.Cmds = append(r.Cmds, cmd)
 }
 
@@ -206,6 +304,7 @@ type CmdConfig struct {
 	Opts    []*CmdOpt
 	Vars    []scopeNode
 	Exports []*ScopeExportList
+	Asserts []*CmdAssert
 }
 
 // CmdOpt wraps a command option.
@@ -228,6 +327,24 @@ func (a *CmdOpt) Apply(c *runfile.RunCmd) *runfile.RunCmdOpt {
 	opt.Value = a.Value
 	opt.Desc = a.Desc.Apply(c.Scope)
 	return opt
+}
+
+// CmdAssert wraps a command assertion.
+//
+type CmdAssert struct {
+	Line    int
+	Test    ScopeValueNode
+	Message ScopeValueNode
+}
+
+// Apply applies the node to the Scope.
+//
+func (a *CmdAssert) Apply(s *runfile.Scope) *runfile.Assert {
+	assert := &runfile.Assert{}
+	assert.Line = a.Line
+	assert.Test = a.Test.Apply(s)
+	assert.Message = strings.TrimSpace(a.Message.Apply(s))
+	return assert
 }
 
 // ScopeAttrAssignment wraps an attribute assignment.

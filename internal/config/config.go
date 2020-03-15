@@ -75,6 +75,7 @@ var EnableRunfileOverride = true
 // TraceFn logs lexer transitions
 //
 func TraceFn(msg string, i interface{}) {
+	//noinspection GoBoolExpressions
 	if EnableFnTrace {
 		fnName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 		log.Println(msg, ":", fnName)

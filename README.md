@@ -69,6 +69,7 @@ In run, the entire script is executed within a single sub-shell.
        - [Forgetting To Define An Exported Variable](#forgetting-to-define-an-exported-variable)
    - [Referencing Other Variables](#referencing-other-variables)
    - [Shell Substitution](#shell-substitution)
+   - [Assertions](#assertions)
    - [Conditional Assignment](#conditional-assignment)
    - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
      - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
@@ -677,10 +678,93 @@ hello:
   echo "${MESSAGE}"
 ```
 
+#### Assertions
+
+Assertions let you check against expected conditions, exiting with an error message when checks fail.
+
+Assertions have the following syntax:
+
+```
+ASSERT <condition> [ "<error message>" | '<error message>' ]
+```
+
+*Note:* The error message is optional and will default to `"Assertion failed"` if not provided
+
+##### Condition
+
+The following condition patterns are supported:
+
+* `[  ...  ]`
+* `[[ ... ]]`
+* `(  ...  )`
+* `(( ... ))`
+
+*Note:* Run does not interpret the condition.  The condition text will be executed, unmodified (including surrounding braces/parens/etc), by the configured shell. Run will inspect the exit status of the check and pass/fail the assertion accordingly.
+
+##### Assertion Example
+
+Here's an example that uses both global and command-level assertions:
+
+_Runfile_
+```
+##
+# Not subject to any assertions
+world:
+	echo Hello, World
+
+# Assertion applies to ALL following commands
+ASSERT [ -n "${HELLO}" ] "Variable HELLO not defined"
+
+##
+# Subject to HELLO assertion, even though it doesn't use it
+newman:
+	echo Hello, Newman
+
+##
+# Subject to HELLO assertion, and adds another
+# ASSERT [ -n "${NAME}" ] 'Variable NAME not defined'
+name:
+	echo ${HELLO}, ${NAME}
+```
+
+_example with no vars_
+```
+$ run world
+
+Hello, World
+
+$ run newman
+
+run: Variable HELLO not defined
+
+$ run name
+
+run: Variable HELLO not defined
+```
+
+_example with HELLO_
+```
+$ HELLO=Hello run newman
+
+Hello, Newman
+
+$ HELLO=Hello run name
+
+run: Variable NAME not defined
+```
+
+_example with HELLO and NAME_
+```
+$ HELLO=Hello NAME=Everybody run name
+
+Hello, Everybody
+```
+
+*Note:* Assertions only apply to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
+
 #### Conditional Assignment
 
 You can conditionally assign a variable, which only assigns a value if one does not already exist.
-
 
 _Runfile_
 ```

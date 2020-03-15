@@ -157,8 +157,6 @@ func LexAssignmentValue(_ *LexContext, l *lexer.Lexer) LexFn {
 	}
 
 	switch l.Peek(1) {
-	// Does it look like a single-quoted string?
-	//
 	case runeSQuote:
 		l.EmitType(TokenSQStringStart)
 		return LexSQString
@@ -255,6 +253,179 @@ func LexSubCmd(_ *LexContext, l *lexer.Lexer) LexFn {
 		}
 	}
 	return nil
+}
+
+// LexAssert assumes 'ASSERT' has already been matched
+//
+func LexAssert(ctx *LexContext, l *lexer.Lexer) LexFn {
+	ignoreSpace(l)
+	ctx.PushFn(LexAssertMessage)
+	return lexTestString
+}
+
+// LexAssertMessage parses an (optional) assertion error message
+//
+func LexAssertMessage(_ *LexContext, l *lexer.Lexer) LexFn {
+	ignoreSpace(l)
+	switch {
+	// "'"
+	//
+	case peekRuneEquals(l, runeSQuote):
+		l.EmitType(TokenSQStringStart)
+		return LexSQString
+	// '"'
+	//
+	case peekRuneEquals(l, runeDQuote):
+		l.EmitType(TokenDQStringStart)
+		return LexDQString
+	default:
+		l.EmitType(TokenEmptyAssertMessage)
+		return nil
+	}
+}
+
+// lexTestString
+//
+func lexTestString(ctx *LexContext, l *lexer.Lexer) LexFn {
+	//noinspection GoImportUsedAsName
+	var (
+		token     token.Type
+		elementFn LexFn
+		endFn     LexFn
+	)
+	switch {
+
+	// '[' | '[['
+	//
+	case matchRune(l, runeLBracket):
+		elementFn = lexBracketStringElement
+		if matchRune(l, runeLBracket) {
+			endFn = lexEndDBracketString
+			token = TokenDBracketStringStart
+		} else {
+			endFn = lexEndBracketString
+			token = TokenBracketStringStart
+		}
+	// '(' | '(('
+	//
+	case matchRune(l, runeLParen):
+		elementFn = lexParenStringElement
+		if matchRune(l, runeLParen) {
+			endFn = lexEndDParenString
+			token = TokenDParenStringStart
+		} else {
+			endFn = lexEndParenString
+			token = TokenParenStringStart
+		}
+	}
+	expectRune(l, ' ', "expecting space (' ')")
+	l.EmitType(token)
+	ctx.PushFn(endFn)
+	return elementFn
+}
+
+// lexEndBracketString
+//
+func lexEndBracketString(_ *LexContext, l *lexer.Lexer) LexFn {
+	expectRune(l, ' ', "expecting space (' ')")
+	expectRune(l, runeRBracket, "expecting right-bracket (']')")
+	l.EmitType(TokenBracketStringEnd)
+	return nil
+}
+
+// lexEndDBracketString
+//
+func lexEndDBracketString(_ *LexContext, l *lexer.Lexer) LexFn {
+	expectRune(l, ' ', "expecting space (' ')")
+	expectRune(l, runeRBracket, "expecting double-right-bracket (']]')")
+	expectRune(l, runeRBracket, "expecting double-right-bracket (']]')")
+	l.EmitType(TokenDBracketStringEnd)
+	return nil
+}
+
+// lexBracketStringElement
+//
+func lexBracketStringElement(_ *LexContext, l *lexer.Lexer) LexFn {
+	switch {
+	// Space may be end of string
+	//
+	case l.CanPeek(1) && l.Peek(1) == ' ' && l.CanPeek(2) && l.Peek(2) == runeRBracket:
+		// Leave text to be matched by endFn
+		//
+		return nil
+	case matchRune(l, ' '):
+		l.EmitToken(TokenRunes)
+	// Consume a run of printable, non-bracket non-escape, non-space characters
+	//
+	case matchOneOrMore(l, isPrintNonBracketNonBackslashNonSpace):
+		l.EmitToken(TokenRunes)
+	// Back-slash '\'
+	//
+	case matchRune(l, runeBackSlash):
+		// In Bracket String mode, currently only '\', '[' and ']' are escapable
+		// Anything else is considered two separate characters
+		//
+		if matchRune(l, runeBackSlash, runeLBracket, runeRBracket) {
+			l.EmitToken(TokenEscapeSequence)
+		} else {
+			l.EmitToken(TokenRunes)
+		}
+	default:
+		return nil
+	}
+	return lexBracketStringElement
+}
+
+// lexEndParenString
+//
+func lexEndParenString(_ *LexContext, l *lexer.Lexer) LexFn {
+	expectRune(l, ' ', "expecting space (' ')")
+	expectRune(l, runeRParen, "expecting right-paren (')')")
+	l.EmitType(TokenParenStringEnd)
+	return nil
+}
+
+// lexEndDParenString
+//
+func lexEndDParenString(_ *LexContext, l *lexer.Lexer) LexFn {
+	expectRune(l, ' ', "expecting space (' ')")
+	expectRune(l, runeRParen, "expecting double-right-paren ('))')")
+	expectRune(l, runeRParen, "expecting double-right-paren ('))')")
+	l.EmitType(TokenDParenStringEnd)
+	return nil
+}
+
+// lexParenStringElement
+//
+func lexParenStringElement(_ *LexContext, l *lexer.Lexer) LexFn {
+	switch {
+	// Space may be end of string
+	//
+	case l.CanPeek(1) && l.Peek(1) == ' ' && l.CanPeek(2) && l.Peek(2) == runeRParen:
+		// Leave text to be matched by endFn
+		//
+		return nil
+	case matchRune(l, ' '):
+		l.EmitToken(TokenRunes)
+	// Consume a run of printable, non-paren non-escape characters
+	//
+	case matchOneOrMore(l, isPrintNonParenNonBackslashNonSpace):
+		l.EmitToken(TokenRunes)
+	// Back-slash '\'
+	//
+	case matchRune(l, runeBackSlash):
+		// In Paren String mode, currently only '\', '(' and ')' are escapable
+		// Anything else is considered two separate characters
+		//
+		if matchRune(l, runeBackSlash, runeLParen, runeRParen) {
+			l.EmitToken(TokenEscapeSequence)
+		} else {
+			l.EmitToken(TokenRunes)
+		}
+	default:
+		return nil
+	}
+	return lexParenStringElement
 }
 
 // LexSQString lexes a Single-Quoted String
@@ -555,13 +726,6 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Desc?
 	//
 	return lexDocBlockNQString
-}
-
-func lexCmdConfigOptEnd(_ *LexContext, l *lexer.Lexer) LexFn {
-	ignoreSpace(l)
-	ignoreEOL(l)
-	l.EmitType(tokenConfigOptEnd)
-	return nil
 }
 
 // LexCmdShellName lexes a command's shell

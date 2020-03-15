@@ -34,21 +34,25 @@ const (
 	runeRBrace    = '}'
 	runeLAngle    = '<'
 	runeRAngle    = '>'
+	runeLBracket  = '['
+	runeRBracket  = ']'
 )
 
 // Single-Rune tokens
 //
 var (
-	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace}
-	singleTokens = []token.Type{TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace}
+	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
+	singleTokens = []token.Type{TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
 )
 var mainTokens = map[string]token.Type{
 	"COMMAND": TokenCommand,
 	"CMD":     TokenCommand,
 	"EXPORT":  TokenExport,
+	"ASSERT":  TokenAssert,
 }
 
-// isMainToken exists soley to appease go-critic
+// isMainToken isolates the lookup+check-ok logic.
+// This is to appease go-critic and allow the call-site to be a switch statement.
 //
 func isMainToken(s string) bool {
 	_, ok := mainTokens[s]
@@ -63,6 +67,7 @@ var cmdConfigTokens = map[string]token.Type{
 	"OPTION": TokenConfigOpt,
 	"OPT":    TokenConfigOpt,
 	"EXPORT": TokenConfigExport,
+	"ASSERT": TokenConfigAssert,
 }
 
 func isAlpha(r rune) bool {
@@ -123,6 +128,14 @@ func isPrintNonParenNonBackslash(r rune) bool {
 	return r != runeLParen && r != runeRParen && r != runeBackSlash && unicode.IsPrint(r)
 }
 
+func isPrintNonBracketNonBackslashNonSpace(r rune) bool {
+	return r != runeLBracket && r != runeRBracket && r != ' ' && r != runeBackSlash && unicode.IsPrint(r)
+}
+
+func isPrintNonParenNonBackslashNonSpace(r rune) bool {
+	return r != runeLParen && r != runeRParen && r != ' ' && r != runeBackSlash && unicode.IsPrint(r)
+}
+
 func isPrintNonBackslashNonDollarNonReturn(r rune) bool {
 	return r != runeBackSlash && r != runeDollar && isPrintNonReturn(r)
 }
@@ -138,6 +151,14 @@ func tryPeekRune(l *lexer.Lexer) (rune, bool) {
 
 func peekRuneEquals(l *lexer.Lexer, r rune) bool {
 	return l.CanPeek(1) && l.Peek(1) == r
+}
+
+func nextIfRuneEquals(l *lexer.Lexer, r rune) bool {
+	if !l.CanPeek(1) || l.Peek(1) != r {
+		return false
+	}
+	l.Next()
+	return true
 }
 
 func expectRune(l *lexer.Lexer, r rune, msg string) {

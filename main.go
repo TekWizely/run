@@ -81,9 +81,10 @@ func main() {
 	// Configure logging
 	//
 	log.SetFlags(0)
-	log.SetPrefix(path.Base(os.Args[0]) + ": ")
+	log.SetPrefix(config.Me + ": ")
 	// Capture panics as log messages
 	//
+	//noinspection GoBoolExpressions
 	if hidePanic {
 		defer func() {
 			if r := recover(); r != nil {
@@ -110,7 +111,8 @@ func main() {
 	//
 	if config.ShebangMode {
 		config.Me = path.Base(shebangFile) // Script Name = executable Name for Help
-		inputFile = shebangFile            // shebang file = runfile
+		log.SetPrefix(config.Me + ": ")
+		inputFile = shebangFile // shebang file = runfile
 		config.EnableRunfileOverride = false
 	} else {
 		parseArgs()
@@ -268,6 +270,7 @@ func readFile(path string) ([]byte, error) {
 	if file, err = os.Open(path); err == nil {
 		// Close file before we exit
 		//
+		//noinspection GoUnhandledErrorResult
 		defer file.Close()
 		// Read file into memory
 		//

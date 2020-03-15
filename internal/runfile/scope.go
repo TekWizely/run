@@ -2,12 +2,21 @@ package runfile
 
 import "os"
 
+// Assert captures an assertion for a runfile.
+//
+type Assert struct {
+	Line    int
+	Test    string
+	Message string
+}
+
 // Scope isolates attrs, vars and exports
 //
 type Scope struct {
 	Attrs   map[string]string // All keys uppercase. Keys include leading '.'
 	Vars    map[string]string // Variables
 	Exports []string          // Exported variables
+	Asserts []*Assert         // Assertions
 }
 
 // NewScope is a convenience method
@@ -17,6 +26,7 @@ func NewScope() *Scope {
 		Attrs:   map[string]string{},
 		Vars:    map[string]string{},
 		Exports: []string{},
+		Asserts: []*Assert{},
 	}
 }
 
@@ -62,4 +72,10 @@ func (s *Scope) AddExport(key string) {
 //
 func (s *Scope) GetExports() []string {
 	return s.Exports
+}
+
+// AddAssert adds an assert to the list of asserts
+//
+func (s *Scope) AddAssert(assert *Assert) {
+	s.Asserts = append(s.Asserts, assert)
 }

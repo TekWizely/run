@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -277,6 +278,7 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
 //
 func ShowCmdHelp(cmd *RunCmd) {
 	var shell = ""
+	//noinspection GoBoolExpressions
 	if config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
@@ -302,6 +304,7 @@ func ShowCmdHelp(cmd *RunCmd) {
 //
 func showCmdUsage(cmd *RunCmd) {
 	var shell = ""
+	//noinspection GoBoolExpressions
 	if config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
@@ -439,6 +442,26 @@ func RunCommand(cmd *RunCmd) {
 			log.Println("Warning: exported variable not defined: ", name)
 		}
 	}
-	shell := cmd.Shell()
+	// Check Asserts - Uses global .SHELL
+	//
+	shell, ok := cmd.Scope.GetAttr(".SHELL")
+	if !ok || len(shell) == 0 {
+		shell = config.DefaultShell
+	}
+	for _, assert := range cmd.Scope.Asserts {
+		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
+			runFile := path.Base(config.RunFile)
+			// Print message if one configured
+			//
+			if len(assert.Message) > 0 {
+				log.Fatalf("%s: %s", runFile, assert.Message)
+			} else {
+				log.Fatalf("%s:%d: Assertion failed", runFile, assert.Line)
+			}
+		}
+	}
+	// Execute script - Uses cmd shell
+	//
+	shell = cmd.Shell()
 	exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
 }

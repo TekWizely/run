@@ -460,7 +460,7 @@ func RunCommand(cmd *RunCmd) {
 			}
 		}
 	}
-	// Execute script
+	// Execute script - Uses cmd shell
 	//
 	shell = cmd.Shell()
 	exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)

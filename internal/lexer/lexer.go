@@ -267,11 +267,15 @@ func LexAssert(ctx *LexContext, l *lexer.Lexer) LexFn {
 //
 func LexAssertMessage(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	switch l.Peek(1) {
-	case runeSQuote:
+	switch {
+	// "'"
+	//
+	case peekRuneEquals(l, runeSQuote):
 		l.EmitType(TokenSQStringStart)
 		return LexSQString
-	case runeDQuote:
+	// '"'
+	//
+	case peekRuneEquals(l, runeDQuote):
 		l.EmitType(TokenDQStringStart)
 		return LexDQString
 	default:
@@ -333,8 +337,8 @@ func lexEndBracketString(_ *LexContext, l *lexer.Lexer) LexFn {
 //
 func lexEndDBracketString(_ *LexContext, l *lexer.Lexer) LexFn {
 	expectRune(l, ' ', "expecting space (' ')")
-	expectRune(l, runeRBracket, "expecting right-bracket (']')")
-	expectRune(l, runeRBracket, "expecting right-bracket (']')")
+	expectRune(l, runeRBracket, "expecting double-right-bracket (']]')")
+	expectRune(l, runeRBracket, "expecting double-right-bracket (']]')")
 	l.EmitType(TokenDBracketStringEnd)
 	return nil
 }
@@ -358,7 +362,7 @@ func lexBracketStringElement(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Back-slash '\'
 	//
 	case matchRune(l, runeBackSlash):
-		// In Test String mode, currently only '\', '[' and ']' are escapable
+		// In Bracket String mode, currently only '\', '[' and ']' are escapable
 		// Anything else is considered two separate characters
 		//
 		if matchRune(l, runeBackSlash, runeLBracket, runeRBracket) {
@@ -385,8 +389,8 @@ func lexEndParenString(_ *LexContext, l *lexer.Lexer) LexFn {
 //
 func lexEndDParenString(_ *LexContext, l *lexer.Lexer) LexFn {
 	expectRune(l, ' ', "expecting space (' ')")
-	expectRune(l, runeRParen, "expecting right-paren (')')")
-	expectRune(l, runeRParen, "expecting right-paren (')')")
+	expectRune(l, runeRParen, "expecting double-right-paren ('))')")
+	expectRune(l, runeRParen, "expecting double-right-paren ('))')")
 	l.EmitType(TokenDParenStringEnd)
 	return nil
 }

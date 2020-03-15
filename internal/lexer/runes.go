@@ -152,7 +152,7 @@ func peekRuneEquals(l *lexer.Lexer, r rune) bool {
 	return l.CanPeek(1) && l.Peek(1) == r
 }
 
-func nextRuneEquals(l *lexer.Lexer, r rune) bool {
+func nextIfRuneEquals(l *lexer.Lexer, r rune) bool {
 	if !l.CanPeek(1) || l.Peek(1) != r {
 		return false
 	}

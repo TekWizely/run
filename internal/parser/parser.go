@@ -470,9 +470,7 @@ func expectAssignmentValue(ctx *parseContext, p *parser.Parser) *ast.ScopeValueN
 // Expects lexer.fn == LexAssertMessage BEFORE calling.
 //
 func expectAssertMessage(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList {
-	if !p.CanPeek(1) {
-		panic(parseError(p, "expecting quoted assert message or eol"))
-	}
+	// LexAssertMessage always returns a token
 	switch p.PeekType(1) {
 	case lexer.TokenSQStringStart:
 		p.Next()
@@ -612,12 +610,20 @@ func expectTestString(_ *parseContext, p *parser.Parser) ast.ScopeValueNode {
 		fn      func(ast.ScopeValueNode) ast.ScopeValueNode
 	)
 	switch {
+	// [ ... ]
+	//
 	case tryPeekType(p, lexer.TokenBracketStringStart):
 		endType, fn, endErr = lexer.TokenBracketStringEnd, ast.NewScopeBracketString, "Expecting TokenBracketStringEnd"
+	// [[ ... ]]
+	//
 	case tryPeekType(p, lexer.TokenDBracketStringStart):
 		endType, fn, endErr = lexer.TokenDBracketStringEnd, ast.NewScopeDBracketString, "Expecting TokenDBracketStringEnd"
+	// ( ... )
+	//
 	case tryPeekType(p, lexer.TokenParenStringStart):
 		endType, fn, endErr = lexer.TokenParenStringEnd, ast.NewScopeParenString, "Expecting TokenParenStringEnd"
+	// (( ... ))
+	//
 	case tryPeekType(p, lexer.TokenDParenStringStart):
 		endType, fn, endErr = lexer.TokenDParenStringEnd, ast.NewScopeDParenString, "Expecting TokenDParenStringEnd"
 	default:

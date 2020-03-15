@@ -277,6 +277,7 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
 //
 func ShowCmdHelp(cmd *RunCmd) {
 	var shell = ""
+	//noinspection GoBoolExpressions
 	if config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
@@ -302,6 +303,7 @@ func ShowCmdHelp(cmd *RunCmd) {
 //
 func showCmdUsage(cmd *RunCmd) {
 	var shell = ""
+	//noinspection GoBoolExpressions
 	if config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
@@ -445,7 +447,7 @@ func RunCommand(cmd *RunCmd) {
 	if !ok || len(shell) == 0 {
 		shell = config.DefaultShell
 	}
-	for _, assert := range cmd.Config.Asserts {
+	for _, assert := range cmd.Scope.Asserts {
 		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
 			// Print message if one configured
 			//

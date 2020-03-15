@@ -113,22 +113,16 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		//
 		case tryPeekType(p, lexer.TokenEquals):
 			p.Next()
-			if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-				ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
-				ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
-			} else {
-				panic(parseError(p, "expecting assignment values"))
-			}
+			valueList = expectAssignmentValue(ctx, p)
+			ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
+			ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
 		// '?='
 		//
 		case tryPeekType(p, lexer.TokenQMarkEquals):
 			p.Next()
-			if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-				ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
-				ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
-			} else {
-				panic(parseError(p, "expecting assignment values"))
-			}
+			valueList = expectAssignmentValue(ctx, p)
+			ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
+			ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
 		// ','
 		//
 		default:
@@ -150,12 +144,14 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	if tryPeekType(p, lexer.TokenAssert) {
 		t := p.Next()
 		ctx.pushLexFn(ctx.l.Fn)
+		ctx.l.PushFn(lexer.LexExpectNewline)
 		ctx.setLexFn(lexer.LexAssert)
 		assert := &ast.ScopeAssert{}
 		assert.Line = t.Line()
 		assert.Test = expectTestString(ctx, p)
-		assert.Message = expectNQString(ctx, p)
+		assert.Message = expectAssertMessage(ctx, p)
 		ctx.ast.AddScopeNode(assert)
+		expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 		p.Clear()
 		return parseMain
 	}
@@ -181,34 +177,28 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	//
 	if name, ok = tryMatchDotAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.Fn)
-		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-			// Let's go ahead and normalize this now
-			//
-			name = strings.ToUpper(name)
-			ctx.ast.AddScopeNode(&ast.ScopeAttrAssignment{Name: name, Value: valueList})
-			return parseMain
-		}
-		panic(parseError(p, "expecting assignment value"))
+		valueList = expectAssignmentValue(ctx, p)
+		// Let's go ahead and normalize this now
+		//
+		name = strings.ToUpper(name)
+		ctx.ast.AddScopeNode(&ast.ScopeAttrAssignment{Name: name, Value: valueList})
+		return parseMain
 	}
 	// Variable Assignment
 	//
 	if name, ok = tryMatchAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.Fn)
-		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-			ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
-			return parseMain
-		}
-		panic(parseError(p, "expecting assignment value"))
+		valueList = expectAssignmentValue(ctx, p)
+		ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
+		return parseMain
 	}
 	// Variable QAssignment
 	//
 	if name, ok = tryMatchQAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.Fn)
-		if valueList, ok = tryMatchAssignmentValue(ctx, p); ok {
-			ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
-			return parseMain
-		}
-		panic(parseError(p, "expecting assignment value"))
+		valueList = expectAssignmentValue(ctx, p)
+		ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
+		return parseMain
 	}
 	// Command
 	//
@@ -324,22 +314,16 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				//
 				case tryPeekType(p, lexer.TokenEquals):
 					p.Next()
-					if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
-						cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarAssignment{Name: name, Value: valueList})
-						cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
-					} else {
-						panic(parseError(p, "expecting assignment value"))
-					}
+					valueList := expectAssignmentValue(ctx, p)
+					cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarAssignment{Name: name, Value: valueList})
+					cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
 				// '?='
 				//
 				case tryPeekType(p, lexer.TokenQMarkEquals):
 					p.Next()
-					if valueList, ok := tryMatchAssignmentValue(ctx, p); ok {
-						cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarQAssignment{Name: name, Value: valueList})
-						cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
-					} else {
-						panic(parseError(p, "expecting assignment value"))
-					}
+					valueList := expectAssignmentValue(ctx, p)
+					cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarQAssignment{Name: name, Value: valueList})
+					cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
 				// ','
 				//
 				default:
@@ -357,12 +341,14 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 			case lexer.TokenConfigAssert:
 				t = p.Next()
 				ctx.pushLexFn(ctx.l.Fn)
+				ctx.l.PushFn(lexer.LexExpectNewline)
 				ctx.setLexFn(lexer.LexAssert)
 				assert := &ast.CmdAssert{}
 				assert.Line = t.Line()
 				assert.Test = expectTestString(ctx, p)
-				assert.Message = expectNQString(ctx, p)
+				assert.Message = expectAssertMessage(ctx, p)
 				cmdConfig.Asserts = append(cmdConfig.Asserts, assert)
+				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 				p.Clear()
 			default:
 				panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
@@ -453,32 +439,52 @@ func tryMatchQAssignmentStart(p *parser.Parser) (string, bool) {
 	return "", false
 }
 
-// tryMatchAssignmentValue
+// expectAssignmentValue
 //
-func tryMatchAssignmentValue(ctx *parseContext, p *parser.Parser) (*ast.ScopeValueNodeList, bool) {
+func expectAssignmentValue(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList {
 	ctx.setLexFn(lexer.LexAssignmentValue)
 	if !p.CanPeek(1) {
-		return ast.NewScopeValueNodeList([]ast.ScopeValueNode{}), false
+		panic(parseError(p, "expecting assignment value"))
 	}
 	switch p.PeekType(1) {
 	case lexer.TokenSQStringStart:
 		p.Next()
-		return expectSQString(ctx, p), true
+		return expectSQString(ctx, p)
 	case lexer.TokenDQStringStart:
 		p.Next()
-		return expectDQString(ctx, p), true
+		return expectDQString(ctx, p)
 	case lexer.TokenVarRefStart:
 		p.Next()
-		return ast.NewScopeValueNodeList1(expectVarRef(ctx, p)), true
+		return ast.NewScopeValueNodeList1(expectVarRef(ctx, p))
 	case lexer.TokenSubCmdStart:
 		p.Next()
-		return ast.NewScopeValueNodeList1(expectSubCmd(ctx, p)), true
+		return ast.NewScopeValueNodeList1(expectSubCmd(ctx, p))
 	case lexer.TokenDollar:
 		t := p.Next()
 		panic(fmt.Sprintf("%d:%d: $ must be followed by '{' or '('", t.Line(), t.Column()))
 	default:
 		value := expectTokenType(p, lexer.TokenRunes, "expecting TokenRunes").Value()
-		return ast.NewScopeValueNodeList1(&ast.ScopeValueRunes{Value: value}), true
+		return ast.NewScopeValueNodeList1(&ast.ScopeValueRunes{Value: value})
+	}
+}
+
+// expectAssertMessage
+// Expects lexer.fn == LexAssertMessage BEFORE calling.
+//
+func expectAssertMessage(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList {
+	if !p.CanPeek(1) {
+		panic(parseError(p, "expecting quoted assert message or eol"))
+	}
+	switch p.PeekType(1) {
+	case lexer.TokenSQStringStart:
+		p.Next()
+		return expectSQString(ctx, p)
+	case lexer.TokenDQStringStart:
+		p.Next()
+		return expectDQString(ctx, p)
+	default:
+		expectTokenType(p, lexer.TokenEmptyAssert, "expecting quoted assert message or eol")
+		return &ast.ScopeValueNodeList{}
 	}
 }
 

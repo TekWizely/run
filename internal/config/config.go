@@ -63,7 +63,7 @@ var EnableFnTrace = false
 
 // ShowScriptFiles shows Command/sub-shell filenames
 //
-var ShowScriptFiles = true
+var ShowScriptFiles = false
 
 // ShowCmdShells shows the command shell in the command's help screen
 var ShowCmdShells = false
@@ -75,6 +75,7 @@ var EnableRunfileOverride = true
 // TraceFn logs lexer transitions
 //
 func TraceFn(msg string, i interface{}) {
+	//noinspection GoBoolExpressions
 	if EnableFnTrace {
 		fnName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 		log.Println(msg, ":", fnName)

@@ -682,54 +682,89 @@ hello:
 
 Assertions let you check against expected conditions, exiting with an error message when checks fail.
 
-##### Syntax
-
 Assertions have the following syntax:
 
 ```
-ASSERT [ <expression> ] <error message>
+ASSERT <condition> [ "<error message>" | '<error message>' ]
 ```
 
-##### Example
+*Note:* The error message is optional and will default to `"Assertion failed"` if not provided
 
-Here's a simple example of using assertions:
+##### Condition
+
+The following condition patterns are supported:
+
+* `[  ...  ]`
+* `[[ ... ]]`
+* `(  ...  )`
+* `(( ... ))`
+
+*Note:* Run does not interpret the condition.  The condition text will be executed, unmodified (including surrounding braces/parens/etc), by the configured shell. Run will inspect the exit status of the check and pass/fail the assertion accordingly.
+
+##### Assertion Example
+
+Here's an example that uses both global and command-level assertions:
 
 _Runfile_
 ```
-ASSERT [ -n "${HELLO}" ] Variable 'HELLO' not defined
+##
+# Not subject to any assertions
+world:
+	echo Hello, World
+
+# Assertion applies to ALL following commands
+ASSERT [ -n "${HELLO}" ] "Variable HELLO not defined"
 
 ##
-# ASSERT [ -n "${NAME}" ] Variable 'NAME' not defined
-hello:
+# Subject to HELLO assertion, even though it doesn't use it
+newman:
+	echo Hello, Newman
+
+##
+# Subject to HELLO assertion, and adds another
+# ASSERT [ -n "${NAME}" ] 'Variable NAME not defined'
+name:
 	echo ${HELLO}, ${NAME}
 ```
 
-_example_
+_example with no vars_
 ```
-$ run hello
+$ run world
 
-run: Variable 'HELLO' not defined
+Hello, World
 
-$ HELLO=Hello run hello
+$ run newman
 
-run: Variable 'NAME' not defined
+run: Variable HELLO not defined
 
-$ HELLO=Hello NAME=Newman run hello
+$ run name
+
+run: Variable HELLO not defined
+```
+
+_example with HELLO_
+```
+$ HELLO=Hello run newman
 
 Hello, Newman
+
+$ HELLO=Hello run name
+
+run: Variable NAME not defined
 ```
 
-##### Unix Test Command
+_example with HELLO and NAME_
+```
+$ HELLO=Hello NAME=Everybody run name
 
-Assert uses the standard unix `test` command to evaluate the test condition.  Lear more here:
+Hello, Everybody
+```
 
-* https://pubs.opengroup.org/onlinepubs/9699919799/utilities/test.html
-
+*Note:* Assertions only apply to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
 
 #### Conditional Assignment
 
 You can conditionally assign a variable, which only assigns a value if one does not already exist.
-
 
 _Runfile_
 ```

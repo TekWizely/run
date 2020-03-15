@@ -63,7 +63,6 @@ const (
 	TokenConfigOptShort
 	TokenConfigOptLong
 	TokenConfigOptValue
-	tokenConfigOptEnd
 	TokenConfigExport
 	TokenConfigAssert
 
@@ -71,6 +70,8 @@ const (
 
 	TokenScriptLine
 	TokenScriptEnd
+
+	TokenEmptyAssert
 
 	TokenUnknownRune
 )

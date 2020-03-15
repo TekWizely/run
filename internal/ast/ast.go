@@ -140,28 +140,11 @@ type ScopeAssert struct {
 // Apply applies the node to the scope.
 //
 func (a *ScopeAssert) Apply(s *runfile.Scope) {
-	env := make(map[string]string)
-	for _, name := range s.GetExports() {
-		if value, ok := s.GetVar(name); ok {
-			env[name] = value
-		} else {
-			log.Println("Warning: exported variable not defined: ", name)
-		}
-	}
-	shell, ok := s.GetAttr(".SHELL")
-	if !ok || len(shell) == 0 {
-		shell = config.DefaultShell
-	}
-	if exec.ExecuteTest(shell, a.Test.Apply(s), env) != 0 {
-		msg := a.Message.Apply(s)
-		// Print message if one configured
-		//
-		if len(msg) > 0 {
-			log.Fatal(msg)
-		} else {
-			log.Fatalf("%d: Assertion failed", a.Line)
-		}
-	}
+	assert := &runfile.Assert{}
+	assert.Line = a.Line
+	assert.Test = a.Test.Apply(s)
+	assert.Message = strings.TrimSpace(a.Message.Apply(s))
+	s.AddAssert(assert)
 }
 
 // ScopeBracketString wraps a bracketed string.
@@ -301,10 +284,13 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	for _, opt := range a.Config.Opts {
 		cmd.Config.Opts = append(cmd.Config.Opts, opt.Apply(cmd))
 	}
-	// Config Asserts
+	// Asserts - Global first, then Command
 	//
+	for _, assert := range r.Scope.Asserts {
+		cmd.Scope.AddAssert(assert)
+	}
 	for _, assert := range a.Config.Asserts {
-		cmd.Config.Asserts = append(cmd.Config.Asserts, assert.Apply(cmd.Scope))
+		cmd.Scope.AddAssert(assert.Apply(cmd.Scope))
 	}
 	r.Cmds = append(r.Cmds, cmd)
 }
@@ -353,8 +339,8 @@ type CmdAssert struct {
 
 // Apply applies the node to the Scope.
 //
-func (a *CmdAssert) Apply(s *runfile.Scope) *runfile.RunCmdAssert {
-	assert := &runfile.RunCmdAssert{}
+func (a *CmdAssert) Apply(s *runfile.Scope) *runfile.Assert {
+	assert := &runfile.Assert{}
 	assert.Line = a.Line
 	assert.Test = a.Test.Apply(s)
 	assert.Message = strings.TrimSpace(a.Message.Apply(s))

@@ -157,8 +157,6 @@ func LexAssignmentValue(_ *LexContext, l *lexer.Lexer) LexFn {
 	}
 
 	switch l.Peek(1) {
-	// Does it look like a single-quoted string?
-	//
 	case runeSQuote:
 		l.EmitType(TokenSQStringStart)
 		return LexSQString
@@ -261,20 +259,31 @@ func LexSubCmd(_ *LexContext, l *lexer.Lexer) LexFn {
 //
 func LexAssert(ctx *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	ctx.PushFn(lexAssertMessage)
+	ctx.PushFn(LexAssertMessage)
 	return lexTestString
 }
 
-// lexAssertMessage
+// LexAssertMessage parses an (optional) assertion error message
 //
-func lexAssertMessage(ctx *LexContext, l *lexer.Lexer) LexFn {
+func LexAssertMessage(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	return lexDocBlockNQString
+	switch l.Peek(1) {
+	case runeSQuote:
+		l.EmitType(TokenSQStringStart)
+		return LexSQString
+	case runeDQuote:
+		l.EmitType(TokenDQStringStart)
+		return LexDQString
+	default:
+		l.EmitType(TokenEmptyAssert)
+		return nil
+	}
 }
 
 // lexTestString
 //
 func lexTestString(ctx *LexContext, l *lexer.Lexer) LexFn {
+	//noinspection GoImportUsedAsName
 	var (
 		token     token.Type
 		elementFn LexFn
@@ -332,7 +341,7 @@ func lexEndDBracketString(_ *LexContext, l *lexer.Lexer) LexFn {
 
 // lexBracketStringElement
 //
-func lexBracketStringElement(ctx *LexContext, l *lexer.Lexer) LexFn {
+func lexBracketStringElement(_ *LexContext, l *lexer.Lexer) LexFn {
 	switch {
 	// Space may be end of string
 	//
@@ -384,7 +393,7 @@ func lexEndDParenString(_ *LexContext, l *lexer.Lexer) LexFn {
 
 // lexParenStringElement
 //
-func lexParenStringElement(ctx *LexContext, l *lexer.Lexer) LexFn {
+func lexParenStringElement(_ *LexContext, l *lexer.Lexer) LexFn {
 	switch {
 	// Space may be end of string
 	//
@@ -713,13 +722,6 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Desc?
 	//
 	return lexDocBlockNQString
-}
-
-func lexCmdConfigOptEnd(_ *LexContext, l *lexer.Lexer) LexFn {
-	ignoreSpace(l)
-	ignoreEOL(l)
-	l.EmitType(tokenConfigOptEnd)
-	return nil
 }
 
 // LexCmdShellName lexes a command's shell

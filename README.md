@@ -912,6 +912,27 @@ hello:
 
 *NOTE:* The `#!` executor does not use `/user/bin/env` to invoke your script.  Instead it attempts to make the temporary script file executable then invoke it directly.
 
+
+-----------------
+### Misc Features
+
+#### Ignoring Script Lines
+
+You can use a `#` on the first column of a command script to ignore a line:
+
+_Runfile_
+```
+hello:
+    # This comment WILL be present in the executed command script
+    echo "Hello, Newman"
+# This comment block WILL NOT be present in the executed command script
+#   echo "Hello, World"
+    echo "Goodbye, now"
+```
+
+*Note:* Run detects and skips these comment lines when parsing the runfile, so the `#` will work regardless of what language the script text is written in (i.e even if the target language doesn't support `#` for comments).
+
+
 ----------------
 ## Special Modes
 

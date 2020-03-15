@@ -84,6 +84,7 @@ func main() {
 	log.SetPrefix(config.Me + ": ")
 	// Capture panics as log messages
 	//
+	//noinspection GoBoolExpressions
 	if hidePanic {
 		defer func() {
 			if r := recover(); r != nil {
@@ -269,6 +270,7 @@ func readFile(path string) ([]byte, error) {
 	if file, err = os.Open(path); err == nil {
 		// Close file before we exit
 		//
+		//noinspection GoUnhandledErrorResult
 		defer file.Close()
 		// Read file into memory
 		//

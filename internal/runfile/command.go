@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -449,12 +450,13 @@ func RunCommand(cmd *RunCmd) {
 	}
 	for _, assert := range cmd.Scope.Asserts {
 		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
+			runFile := path.Base(config.RunFile)
 			// Print message if one configured
 			//
 			if len(assert.Message) > 0 {
-				log.Fatal(assert.Message)
+				log.Fatalf("%s: %s", runFile, assert.Message)
 			} else {
-				log.Fatalf("%d: Assertion failed", assert.Line)
+				log.Fatalf("%s:%d: Assertion failed", runFile, assert.Line)
 			}
 		}
 	}

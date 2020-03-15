@@ -260,7 +260,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 		// Desc
 		//
 		for !tryPeekType(p, lexer.TokenConfigDescEnd) {
-			line := expectNQString(ctx, p)
+			line := expectDocNQString(ctx, p)
 			cmdConfig.Desc = append(cmdConfig.Desc, line)
 		}
 		expectTokenType(p, lexer.TokenConfigDescEnd, "Expecting TokenConfigDescEnd")
@@ -283,7 +283,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				p.Next()
 				ctx.pushLexFn(ctx.l.Fn)
 				ctx.setLexFn(lexer.LexCmdConfigUsage)
-				usage := expectNQString(ctx, p)
+				usage := expectDocNQString(ctx, p)
 				cmdConfig.Usages = append(cmdConfig.Usages, usage)
 				p.Clear()
 			case lexer.TokenConfigOpt:
@@ -301,7 +301,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				if tryPeekType(p, lexer.TokenConfigOptValue) {
 					opt.Value = p.Next().Value()
 				}
-				opt.Desc = expectNQString(ctx, p)
+				opt.Desc = expectDocNQString(ctx, p)
 				cmdConfig.Opts = append(cmdConfig.Opts, opt)
 			case lexer.TokenConfigExport:
 				p.Next()
@@ -360,11 +360,9 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 	return cmdConfig, cmdConfig != nil
 }
 
-// expectNQString
-// Expects lexer.fn == lexDocBlockNQString BEFORE calling.
-// Expects EOF | EOL.
+// expectDocNQString - Expects lexer.fn == lexDocBlockNQString BEFORE calling.
 //
-func expectNQString(ctx *parseContext, p *parser.Parser) ast.ScopeValueNode {
+func expectDocNQString(ctx *parseContext, p *parser.Parser) ast.ScopeValueNode {
 	values := make([]ast.ScopeValueNode, 0)
 
 	for p.CanPeek(1) && !tryPeekType(p, lexer.TokenNewline) {

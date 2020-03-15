@@ -481,7 +481,7 @@ func expectAssertMessage(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNod
 		p.Next()
 		return expectDQString(ctx, p)
 	default:
-		expectTokenType(p, lexer.TokenEmptyAssert, "expecting quoted assert message or eol")
+		expectTokenType(p, lexer.TokenEmptyAssertMessage, "expecting quoted assert message or eol")
 		return &ast.ScopeValueNodeList{}
 	}
 }

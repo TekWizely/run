@@ -71,7 +71,7 @@ const (
 	TokenScriptLine
 	TokenScriptEnd
 
-	TokenEmptyAssert
+	TokenEmptyAssertMessage
 
 	TokenUnknownRune
 )

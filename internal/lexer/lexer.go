@@ -275,7 +275,7 @@ func LexAssertMessage(_ *LexContext, l *lexer.Lexer) LexFn {
 		l.EmitType(TokenDQStringStart)
 		return LexDQString
 	default:
-		l.EmitType(TokenEmptyAssert)
+		l.EmitType(TokenEmptyAssertMessage)
 		return nil
 	}
 }

@@ -844,6 +844,34 @@ func lexCmdScriptLine(_ *LexContext, l *lexer.Lexer) LexFn {
 		return lexCmdScriptLine
 	}
 	m := l.Marker()
+	// # at beginning of script line = ignore line
+	//
+	if peekRuneEquals(l, runeHash) {
+		// Consume comment block
+		//
+		for peekRuneEquals(l, runeHash) {
+			l.Next()
+			// Consume rest of line, including newline
+			//
+			for !matchNewlineOrEOF(l) {
+				l.Next()
+			}
+		}
+		// If the line following the comment block is not part of the script,
+		// then assume the comment is also not part of the script
+		// NOTE: We have to include RBrace here on the chance that the user
+		//       is using braces to wrap the script.
+		//
+		m2 := l.Marker()
+		if matchNewlineOrEOF(l) || matchOneOrMore(l, isSpaceOrTab) || matchRune(l, runeRBrace) {
+			m2.Apply()
+			l.Clear() // Discard the comment block
+			return lexCmdScriptLine
+		}
+		m.Apply() // End script before comment block
+		l.EmitType(TokenScriptEnd)
+		return nil
+	}
 	// !whitespace at beginning of non-blank line terminates script
 	//
 	if !matchOneOrMore(l, isSpaceOrTab) {

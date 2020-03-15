@@ -69,10 +69,10 @@ In run, the entire script is executed within a single sub-shell.
        - [Forgetting To Define An Exported Variable](#forgetting-to-define-an-exported-variable)
    - [Referencing Other Variables](#referencing-other-variables)
    - [Shell Substitution](#shell-substitution)
-   - [Assertions](#assertions)
    - [Conditional Assignment](#conditional-assignment)
-   - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
-     - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
+ - [Assertions](#assertions)
+ - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
+   - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
    - [Per-Command Shell Config](#per-command-shell-config)
    - [Global Default Shell Config](#global-default-shell-config)
@@ -678,7 +678,36 @@ hello:
   echo "${MESSAGE}"
 ```
 
-#### Assertions
+#### Conditional Assignment
+
+You can conditionally assign a variable, which only assigns a value if one does not already exist.
+
+_Runfile_
+```
+EXPORT NAME ?= "world"
+
+##
+# Hello world example.
+hello:
+  echo "Hello, ${NAME}"
+```
+
+_example with default_
+```
+$ run hello
+
+Hello, world
+```
+
+_example with override_
+```
+NAME="Newman" run hello
+
+Hello, Newman
+```
+
+--------------
+### Assertions
 
 Assertions let you check against expected conditions, exiting with an error message when checks fail.
 
@@ -690,7 +719,7 @@ ASSERT <condition> [ "<error message>" | '<error message>' ]
 
 *Note:* The error message is optional and will default to `"Assertion failed"` if not provided
 
-##### Condition
+#### Condition
 
 The following condition patterns are supported:
 
@@ -701,7 +730,7 @@ The following condition patterns are supported:
 
 *Note:* Run does not interpret the condition.  The condition text will be executed, unmodified (including surrounding braces/parens/etc), by the configured shell. Run will inspect the exit status of the check and pass/fail the assertion accordingly.
 
-##### Assertion Example
+#### Assertion Example
 
 Here's an example that uses both global and command-level assertions:
 
@@ -762,37 +791,10 @@ Hello, Everybody
 
 *Note:* Assertions only apply to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
 
-#### Conditional Assignment
+--------------------------------------
+### Invoking Other Commands & Runfiles
 
-You can conditionally assign a variable, which only assigns a value if one does not already exist.
-
-_Runfile_
-```
-EXPORT NAME ?= "world"
-
-##
-# Hello world example.
-hello:
-  echo "Hello, ${NAME}"
-```
-
-_example with default_
-```
-$ run hello
-
-Hello, world
-```
-
-_example with override_
-```
-NAME="Newman" run hello
-
-Hello, Newman
-```
-
-#### Invoking Other Commands & Runfiles
-
-##### .RUN / .RUNFILE Attributes
+#### .RUN / .RUNFILE Attributes
 Run exposes the following attributes:
 
 * `.RUN` - Absolute path of the run binary currently in use
@@ -819,7 +821,6 @@ $ run test
 
 Hello, World
 ```
-
 
 -----------------
 ### Script Shells

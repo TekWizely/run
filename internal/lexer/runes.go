@@ -51,7 +51,8 @@ var mainTokens = map[string]token.Type{
 	"ASSERT":  TokenAssert,
 }
 
-// isMainToken exists solely to appease go-critic
+// isMainToken isolates the lookup+check-ok logic.
+// This is to appease go-critic and allow the call-site to be a switch statement.
 //
 func isMainToken(s string) bool {
 	_, ok := mainTokens[s]

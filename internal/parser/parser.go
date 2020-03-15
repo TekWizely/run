@@ -442,7 +442,7 @@ func tryMatchQAssignmentStart(p *parser.Parser) (string, bool) {
 func expectAssignmentValue(ctx *parseContext, p *parser.Parser) *ast.ScopeValueNodeList {
 	ctx.setLexFn(lexer.LexAssignmentValue)
 	if !p.CanPeek(1) {
-		panic(parseError(p, "expecting assignment value"))
+		return ast.NewScopeValueNodeList([]ast.ScopeValueNode{})
 	}
 	switch p.PeekType(1) {
 	case lexer.TokenSQStringStart:

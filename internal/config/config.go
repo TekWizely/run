@@ -14,7 +14,7 @@ type Command struct {
 	Name   string
 	Title  string
 	Help   func()
-	Run    func()
+	Run    func() int
 	Rename func(string) // Rename Command to script Name in 'main' mode
 }
 

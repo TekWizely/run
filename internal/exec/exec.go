@@ -110,3 +110,10 @@ func tempFile(pattern string) (*os.File, error) {
 	}
 	return ioutil.TempFile(tempDir, pattern)
 }
+
+func CleanupTemporaryDir() error {
+	if tempDir != "" {
+		return os.RemoveAll(tempDir)
+	}
+	return nil
+}

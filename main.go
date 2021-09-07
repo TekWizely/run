@@ -63,14 +63,22 @@ func showUsage() {
 
 // showVersion exits with error code 0
 //
-func showVersion() {
+func showVersion() int {
 	fmt.Println("run", versionString())
-	os.Exit(0)
+	return 0
 }
 
 // main
 //
 func main() {
+	// Propagate the exit code correctly.
+	// os.Exit aborts program immediately, so delay as long as possible
+	// First defer in = last defer out
+	cmdExitCode := 0
+	defer func() {
+		os.Exit(cmdExitCode)
+	}()
+
 	config.ErrOut = os.Stderr
 	if exec, err := os.Executable(); err != nil { // Returns abs path on success
 		config.RunBin = exec
@@ -104,7 +112,8 @@ func main() {
 			}
 			config.ShebangMode = len(shebangFile) > 0 && path.Base(shebangFile) != runfileDefault
 		} else if strings.EqualFold(os.Args[1], "version") {
-			showVersion()
+			cmdExitCode = showVersion()
+			return
 		}
 	}
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
@@ -149,7 +158,7 @@ func main() {
 		Name:   "list",
 		Title:  "(builtin) List available commands",
 		Help:   func() { runfile.ListCommands() },
-		Run:    func() { runfile.ListCommands() },
+		Run:    func() int { runfile.ListCommands(); return 0 },
 		Rename: func(_ string) {},
 	}
 	config.CommandMap["list"] = listCmd
@@ -158,7 +167,7 @@ func main() {
 		Name:   "help",
 		Title:  "(builtin) Show Help for a command",
 		Help:   showUsage,
-		Run:    func() { runfile.RunHelp(rf) },
+		Run:    func() int { runfile.RunHelp(rf); return 0 },
 		Rename: func(_ string) {},
 	}
 	config.CommandMap["help"] = helpCmd
@@ -173,7 +182,7 @@ func main() {
 	versionCmd := &config.Command{
 		Name:   versionName,
 		Title:  "(builtin) Show Run version",
-		Help:   showVersion,
+		Help:   func() { showVersion() },
 		Run:    showVersion,
 		Rename: func(_ string) {},
 	}
@@ -189,7 +198,7 @@ func main() {
 			Name:   rfcmd.Name,
 			Title:  rfcmd.Title(),
 			Help:   func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(rfcmd),
-			Run:    func(c *runfile.RunCmd) func() { return func() { runfile.RunCommand(c) } }(rfcmd),
+			Run:    func(c *runfile.RunCmd) func() int { return func() int { return runfile.RunCommand(c) } }(rfcmd),
 			Rename: func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(rfcmd),
 		}
 		config.CommandMap[name] = cmd
@@ -227,7 +236,7 @@ func main() {
 	//
 	cmdName = strings.ToLower(cmdName) // normalize
 	if cmd, ok := config.CommandMap[cmdName]; ok {
-		cmd.Run()
+		cmdExitCode = cmd.Run()
 	} else {
 		log.Printf("command not found: %s", cmdName)
 		runfile.ListCommands()

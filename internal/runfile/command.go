@@ -432,7 +432,7 @@ func RunHelp(_ *Runfile) {
 
 // RunCommand executes a command.
 //
-func RunCommand(cmd *RunCmd) {
+func RunCommand(cmd *RunCmd) int {
 	os.Args = evaluateCmdOpts(cmd, os.Args)
 	env := make(map[string]string)
 	for _, name := range cmd.Scope.GetExports() {
@@ -463,5 +463,5 @@ func RunCommand(cmd *RunCmd) {
 	// Execute script - Uses cmd shell
 	//
 	shell = cmd.Shell()
-	exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
+	return exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
 }

@@ -61,22 +61,25 @@ func showUsage() {
 	os.Exit(2)
 }
 
-// showVersion exits with error code 0
+// showVersion
 //
-func showVersion() int {
+func showVersion() {
 	fmt.Println("run", versionString())
-	return 0
 }
 
 // main
 //
 func main() {
-	// Propagate the exit code correctly.
+	// Propagate cmd exit code if non-0
 	// os.Exit aborts program immediately, so delay as long as possible
 	// First defer in = last defer out
+	// NOTE: Only set this from exit status of run commands (builtins ok too)
+	//       Actual errors in Run proper should invoke os.Exit directly
 	cmdExitCode := 0
 	defer func() {
-		os.Exit(cmdExitCode)
+		if cmdExitCode != 0 {
+			os.Exit(cmdExitCode)
+		}
 	}()
 
 	config.ErrOut = os.Stderr
@@ -112,8 +115,8 @@ func main() {
 			}
 			config.ShebangMode = len(shebangFile) > 0 && path.Base(shebangFile) != runfileDefault
 		} else if strings.EqualFold(os.Args[1], "version") {
-			cmdExitCode = showVersion()
-			return
+			showVersion()
+			return // Exit early
 		}
 	}
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
@@ -166,7 +169,7 @@ func main() {
 	helpCmd := &config.Command{
 		Name:   "help",
 		Title:  "(builtin) Show Help for a command",
-		Help:   showUsage,
+		Help:   showUsage, // exits
 		Run:    func() int { runfile.RunHelp(rf); return 0 },
 		Rename: func(_ string) {},
 	}
@@ -183,7 +186,7 @@ func main() {
 		Name:   versionName,
 		Title:  "(builtin) Show Run version",
 		Help:   func() { showVersion() },
-		Run:    showVersion,
+		Run:    func() int { showVersion(); return 0 },
 		Rename: func(_ string) {},
 	}
 	config.CommandMap[versionName] = versionCmd
@@ -247,7 +250,7 @@ func main() {
 func parseArgs() {
 	var showHelp bool
 	flag.CommandLine.SetOutput(config.ErrOut)
-	flag.CommandLine.Usage = showUsage // Invoked if error parsing args
+	flag.CommandLine.Usage = showUsage // exits - Invoked if error parsing args
 	flag.BoolVar(&showHelp, "help", false, "")
 	flag.BoolVar(&showHelp, "h", false, "")
 	// No -r/--runfile support in shebang mode
@@ -261,7 +264,7 @@ func parseArgs() {
 	// Help?
 	//
 	if showHelp {
-		showUsage()
+		showUsage() // exits
 	}
 }
 

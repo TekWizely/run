@@ -192,11 +192,18 @@ func main() {
 	config.CommandMap[versionName] = versionCmd
 	config.CommandList = append(config.CommandList, versionCmd)
 	builtinCnt := len(config.CommandList)
+	commandLocations := make(map[string]int)
+
 	for _, rfcmd := range rf.Cmds {
 		name := strings.ToLower(rfcmd.Name) // normalize
 		if _, ok := config.CommandMap[name]; ok {
-			panic("Duplicate command: " + name)
+			if prevline, ok := commandLocations[name]; ok {
+				panic(fmt.Sprintf("Duplicate command: %s defined on line %d -- originally defined on line %d", name, rfcmd.Line, prevline))
+			} else {
+				panic(fmt.Sprintf("Duplicate command: %s defined on line %d -- this command is built-in", name, rfcmd.Line))
+			}
 		}
+		commandLocations[name] = rfcmd.Line
 		cmd := &config.Command{
 			Name:   rfcmd.Name,
 			Title:  rfcmd.Title(),

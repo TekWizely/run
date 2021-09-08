@@ -225,6 +225,7 @@ type Cmd struct {
 	Name   string
 	Config *CmdConfig
 	Script []string
+	Line   int
 }
 
 // Apply applies the node to the runfile.
@@ -234,6 +235,7 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 		Name:   a.Name,
 		Scope:  runfile.NewScope(),
 		Script: a.Script,
+		Line:   a.Line,
 	}
 	// Exports
 	//

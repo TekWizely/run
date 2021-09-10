@@ -2,8 +2,14 @@
 # Project-Specific
 # ==============================================================================
 
+# direnv
+.envrc
+
 # Output of `go build`
 run
+
+# `GOBIN="$PWD/bin" go install`
+bin/
 
 # Testing Runfile(s)
 Runfile
@@ -34,7 +40,6 @@ dist/
 # Output of the go coverage tool
 *.out
 
-
 # ==============================================================================
 # IntelliJ
 # ==============================================================================
@@ -53,7 +58,7 @@ dist/
 .LSOverride
 
 # Icon must end with two \r
-# DF: Going to try * instad
+# DF: Going to try * instead
 Icon*
 
 # Thumbnails

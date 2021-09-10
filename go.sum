@@ -1,9 +1,8 @@
 github.com/tekwizely/go-parsing/lexer v0.0.0-20190714043513-9514494dd58a/go.mod h1:M1+qLv1DBvWnJVqjBkbGN49/c78ZrS6Js2ZJ3J6gEnA=
-github.com/tekwizely/go-parsing/lexer v0.0.0-20190714215300-5be83bb42370 h1:Ieshi9To2bpMG7jmchbmxf1rredEZ32tL6hSDoRNS1Q=
-github.com/tekwizely/go-parsing/lexer v0.0.0-20190714215300-5be83bb42370/go.mod h1:M1+qLv1DBvWnJVqjBkbGN49/c78ZrS6Js2ZJ3J6gEnA=
-github.com/tekwizely/go-parsing/lexer/token v0.0.0-20190714025745-8a1a69651c50 h1:0rK3cJNhAYI+exynW59dxUfj0zhpimyLwlHEUczRiSc=
+github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15 h1:All3gqlRswSCOaeaQb8p7wMxdoK8w+z5T7CjWyiKq7o=
+github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15/go.mod h1:M1+qLv1DBvWnJVqjBkbGN49/c78ZrS6Js2ZJ3J6gEnA=
 github.com/tekwizely/go-parsing/lexer/token v0.0.0-20190714025745-8a1a69651c50/go.mod h1:hrGEp224LWZwYH1FrdvwQC2uMjZdX5MDsydAc5FnrXM=
-github.com/tekwizely/go-parsing/lexer/token v0.0.0-20190714215300-5be83bb42370 h1:ouFvsNQ0DroHbVK3TjL2YncMoC1M6no2jTbeDJTNfFg=
-github.com/tekwizely/go-parsing/lexer/token v0.0.0-20190714215300-5be83bb42370/go.mod h1:hrGEp224LWZwYH1FrdvwQC2uMjZdX5MDsydAc5FnrXM=
-github.com/tekwizely/go-parsing/parser v0.0.0-20190714215300-5be83bb42370 h1:CfhhC3zBRdLqCH8Hb7DTrBSsY1CgzHzXPNEgF+rwNG0=
-github.com/tekwizely/go-parsing/parser v0.0.0-20190714215300-5be83bb42370/go.mod h1:8HolNblTMzOKF+p5Fno0hLiAu2ykgl9Utsq036uEi8s=
+github.com/tekwizely/go-parsing/lexer/token v0.0.0-20210910181107-ed69a13f4d15 h1:lf+8rI/3cB1BSIdGhycmKQgpTzQ6iywEtr2ofK3N2Ps=
+github.com/tekwizely/go-parsing/lexer/token v0.0.0-20210910181107-ed69a13f4d15/go.mod h1:hrGEp224LWZwYH1FrdvwQC2uMjZdX5MDsydAc5FnrXM=
+github.com/tekwizely/go-parsing/parser v0.0.0-20210910181107-ed69a13f4d15 h1:Eyefrt0lw1dgErIKTJgpHKwFpHNCe8u8LpSfni75wV4=
+github.com/tekwizely/go-parsing/parser v0.0.0-20210910181107-ed69a13f4d15/go.mod h1:8HolNblTMzOKF+p5Fno0hLiAu2ykgl9Utsq036uEi8s=

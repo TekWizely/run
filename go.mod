@@ -9,9 +9,7 @@ go 1.13
 // $ go get github.com/tekwizely/go-parsing/parser@master
 //
 require (
-	github.com/tekwizely/go-parsing/lexer v0.0.0-20190714215300-5be83bb42370
-	github.com/tekwizely/go-parsing/lexer/token v0.0.0-20190714215300-5be83bb42370
-	github.com/tekwizely/go-parsing/parser v0.0.0-20190714215300-5be83bb42370
+	github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15
+	github.com/tekwizely/go-parsing/lexer/token v0.0.0-20210910181107-ed69a13f4d15
+	github.com/tekwizely/go-parsing/parser v0.0.0-20210910181107-ed69a13f4d15
 )
-
-//replace github.com/tekwizely/go-parsing/parser => /Users/david/Documents/Dev/TekWizely/Go/go-parsing/src/github.com/tekwizely/go-parsing/parser

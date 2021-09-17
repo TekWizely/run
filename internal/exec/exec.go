@@ -11,7 +11,7 @@ import (
 	"github.com/tekwizely/run/internal/config"
 )
 
-var tempDir string
+var tmpDir string
 
 func executeScript(shell string, script []string, args []string, env map[string]string, prefix string, out io.Writer) int {
 	if shell == "" {
@@ -20,16 +20,13 @@ func executeScript(shell string, script []string, args []string, env map[string]
 	if len(script) == 0 {
 		return 0
 	}
-	tmpFile, err := tempFile(fmt.Sprintf("%s-%s-*.sh", prefix, shell))
+	// Tmp file will be cleaned up via CleanupTemporaryDir
+	//
+	tmpFile, err := tmpFile(fmt.Sprintf("%s-%s-*.sh", prefix, shell))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer tmpFile.Close()
-	if config.ShowScriptFiles {
-		fmt.Fprintln(config.ErrOut, tmpFile.Name())
-	} else {
-		defer os.Remove(tmpFile.Name()) // clean up
-	}
 
 	for _, line := range script {
 		if _, err = tmpFile.Write([]byte(line)); err != nil {
@@ -98,22 +95,29 @@ func ExecuteTest(shell string, test string, env map[string]string) int {
 	return executeScript(shell, []string{test}, []string{}, env, "test", os.Stdout)
 }
 
-// tempFile
+// tmpFile creates a temporary file relative to tmpDir
+// Created files will be cleaned up in CleanupTemporaryDir
 //
-func tempFile(pattern string) (*os.File, error) {
-	if tempDir == "" {
+func tmpFile(pattern string) (*os.File, error) {
+	if tmpDir == "" {
 		var err error
-		tempDir, err = ioutil.TempDir("", "runfile-")
+		tmpDir, err = ioutil.TempDir("", "runfile-")
+		if config.ShowScriptTmpDir {
+			fmt.Fprintln(config.ErrOut, "temp dir: ", tmpDir)
+		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	return ioutil.TempFile(tempDir, pattern)
+	return ioutil.TempFile(tmpDir, pattern)
 }
 
+// CleanupTemporaryDir attempts to remove the previously created tmpDir
+// and any files within it.
+//
 func CleanupTemporaryDir() error {
-	if tempDir != "" {
-		return os.RemoveAll(tempDir)
+	if tmpDir != "" && !config.ShowScriptTmpDir {
+		return os.RemoveAll(tmpDir)
 	}
 	return nil
 }

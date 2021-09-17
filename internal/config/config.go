@@ -61,9 +61,9 @@ var RunFile string
 //
 var EnableFnTrace = false
 
-// ShowScriptFiles shows Command/sub-shell filenames
+// ShowScriptTmpDir shows the directory where Command/sub-shell scripts are stored
 //
-var ShowScriptFiles = false
+var ShowScriptTmpDir = false
 
 // ShowCmdShells shows the command shell in the command's help screen
 var ShowCmdShells = false

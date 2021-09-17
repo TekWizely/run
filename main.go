@@ -71,25 +71,26 @@ func showVersion() {
 // main
 //
 func main() {
-	// Propagate cmd exit code if non-0
-	// os.Exit aborts program immediately, so delay as long as possible
-	// First defer in = last defer out
 	// NOTE: Only set this from exit status of run commands (builtins ok too)
 	//       Actual errors in Run proper should invoke os.Exit directly
 	cmdExitCode := 0
+	// First defer in = last defer out
+	//
 	defer func() {
-		err := exec.CleanupTemporaryDir()
-		if err != nil {
-			log.Printf("run: failed to clean up temporary dir: %s", err)
-		}
+		// Cleanup temp folder/files
+		//
+		_ = exec.CleanupTemporaryDir() // TODO Message on error?
+		// Propagate cmd exit code if non-0
+		// os.Exit aborts program immediately, so delay as long as possible
+		//
 		if cmdExitCode != 0 {
 			os.Exit(cmdExitCode)
 		}
 	}()
 
 	config.ErrOut = os.Stderr
-	if exec, err := os.Executable(); err != nil { // Returns abs path on success
-		config.RunBin = exec
+	if execPath, err := os.Executable(); err != nil { // Returns abs path on success
+		config.RunBin = execPath
 	} else {
 		config.RunBin = os.Args[0] // Punt to arg[0]
 	}

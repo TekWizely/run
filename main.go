@@ -12,6 +12,7 @@ import (
 
 	"github.com/tekwizely/run/internal/ast"
 	"github.com/tekwizely/run/internal/config"
+	"github.com/tekwizely/run/internal/exec"
 	"github.com/tekwizely/run/internal/lexer"
 	"github.com/tekwizely/run/internal/parser"
 	"github.com/tekwizely/run/internal/runfile"
@@ -77,6 +78,10 @@ func main() {
 	//       Actual errors in Run proper should invoke os.Exit directly
 	cmdExitCode := 0
 	defer func() {
+		err := exec.CleanupTemporaryDir()
+		if err != nil {
+			log.Printf("run: failed to clean up temporary dir: %s", err)
+		}
 		if cmdExitCode != 0 {
 			os.Exit(cmdExitCode)
 		}

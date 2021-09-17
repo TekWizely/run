@@ -215,12 +215,13 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 		name  string
 		shell string
 		ok    bool
+		line  int
 	)
 	if config == nil {
 		config = &ast.CmdConfig{}
 	}
 
-	if name, shell, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
+	if name, shell, line, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
 		return false
 	}
 	ctx.pushLexFn(ctx.l.Fn)
@@ -244,7 +245,7 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 	if len(script) == 0 {
 		panic(parseError(p, "command '"+name+"' contains an empty script."))
 	}
-	ctx.ast.Add(&ast.Cmd{Name: name, Config: config, Script: script})
+	ctx.ast.Add(&ast.Cmd{Name: name, Config: config, Script: script, Line: line})
 	return true
 }
 
@@ -653,7 +654,7 @@ func expectTestString(_ *parseContext, p *parser.Parser) ast.ScopeValueNode {
 
 // tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
-func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, bool) {
+func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, int, bool) {
 	expectCommand := tryPeekType(p, lexer.TokenCommand)
 	if expectCommand {
 		expectTokenType(p, lexer.TokenCommand, "Expecting TokenCommand")
@@ -665,16 +666,22 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, st
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLBrace)
 	}
 	if !expectCommand {
-		return "", "", false
+		return "", "", -1, false
 	}
 	// Name
 	//
+	startLine := -1
+	var t token.Token
 	var name string
+
 	if tryPeekType(p, lexer.TokenDashID) {
-		name = expectTokenType(p, lexer.TokenDashID, "Expecting command name").Value()
+		t = expectTokenType(p, lexer.TokenDashID, "Expecting command name")
 	} else {
-		name = expectTokenType(p, lexer.TokenID, "Expecting command name").Value()
+		t = expectTokenType(p, lexer.TokenID, "Expecting command name")
 	}
+	name = t.Value()
+	startLine = t.Line()
+
 	// Shell
 	//
 	shell := ""
@@ -691,7 +698,7 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, st
 		panic(parseError(p, "Expecting TokenColon (':') or TokenLBrace ('{')"))
 	}
 	p.Clear()
-	return name, shell, true
+	return name, shell, startLine, true
 }
 
 // expectCmdScript

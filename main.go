@@ -16,10 +16,12 @@ import (
 	"github.com/tekwizely/run/internal/lexer"
 	"github.com/tekwizely/run/internal/parser"
 	"github.com/tekwizely/run/internal/runfile"
+	"github.com/tekwizely/run/internal/util"
 )
 
 const (
 	runfileDefault = "Runfile"
+	runfileEnv     = "RUNFILE"
 )
 
 var (
@@ -29,10 +31,11 @@ var (
 
 // showUsage exits with error code 2.
 //
+//goland:noinspection GoUnhandledErrorResult
 func showUsage() {
 	runfileOpt := ""
 	if config.EnableRunfileOverride {
-		runfileOpt = "[-r runfile] "
+		runfileOpt = "[-r runfile] " // needs trailing space
 	}
 	pad := strings.Repeat(" ", len(config.Me)-1)
 	fmt.Fprintf(config.ErrOut, "Usage:\n")
@@ -49,7 +52,7 @@ func showUsage() {
 	fmt.Fprintln(config.ErrOut, "        Show help screen")
 	if config.EnableRunfileOverride {
 		fmt.Fprintln(config.ErrOut, "  -r, --runfile <file>")
-		fmt.Fprintf(config.ErrOut, "        Specify runfile (default='%s')\n", runfileDefault)
+		fmt.Fprintf(config.ErrOut, "        Specify runfile (default='${%s:-%s}')\n", runfileEnv, runfileDefault)
 	}
 	fmt.Fprintln(config.ErrOut, "Note:")
 	fmt.Fprintln(config.ErrOut, "  Options accept '-' | '--'")
@@ -266,11 +269,12 @@ func parseArgs() {
 	flag.CommandLine.Usage = showUsage // exits - Invoked if error parsing args
 	flag.BoolVar(&showHelp, "help", false, "")
 	flag.BoolVar(&showHelp, "h", false, "")
-	// No -r/--runfile support in shebang mode
+	// No $RUNFILE/-r/--runfile support in shebang mode
 	//
 	if config.EnableRunfileOverride {
-		flag.StringVar(&inputFile, "runfile", runfileDefault, "")
-		flag.StringVar(&inputFile, "r", runfileDefault, "")
+		defaultInputFile := util.GetEnvOrDefault(runfileEnv, runfileDefault)
+		flag.StringVar(&inputFile, "runfile", defaultInputFile, "")
+		flag.StringVar(&inputFile, "r", defaultInputFile, "")
 	}
 	flag.Parse()
 	os.Args = flag.Args()

@@ -60,6 +60,8 @@ In run, the entire script is executed within a single sub-shell.
    - [Passing Options Directly Through to the Command Script](#passing-options-directly-through-to-the-command-script)
  - [Run Tool Help](#run-tool-help)
  - [Using an Alternative Runfile](#using-an-alternative-runfile)
+   - [Via Command-Line](#via-command-line)
+   - [Via Environment Variable](#via-environment-variable)
  - [Runfile Variables](#runfile-variables)
    - [Local By Default](#local-by-default)
    - [Exporting Variables](#exporting-variables)
@@ -202,7 +204,7 @@ _list commands_
 ```
 $ run list
 
-panic: Duplicate command: hello-world
+run: Duplicate command: hello-world defined on line 4 -- originally defined on line 1
 ```
 
 ----------------------------
@@ -487,16 +489,28 @@ Note:
   Short options cannot be combined
 ```
 
-------------------------------------
+--------------------------------
 ### Using an Alternative Runfile
+
+#### Via Command Line
 
 You can specify a runfile using the `-r | --runfile` option:
 
 ```
-$ run --runfile /path/to/my/file <command>
+$ run --runfile /path/to/my/Runfile <command>
 ```
 
-When specifying a runfile, the file does **not** have to be named `"Runfile"`.
+#### Via Environment Variable
+
+You can specify a runfile using the `RUNFILE` environment variable:
+
+```
+$ export RUNFILE="/path/to/my/Runfile"
+
+$ run <command>
+```
+
+NOTE: When specifying a runfile, the file does **not** have to be named `"Runfile"`.
 
 ---------------------
 ### Runfile Variables

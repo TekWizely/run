@@ -515,7 +515,6 @@ For some other interesting uses of `$RUNFILE`, see:
 * [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
 * [Using direnv to auto-configure $RUNFILE](#using-direnv-to-auto-configure-runfile)
 
-
 NOTE: When specifying a runfile, the file does **not** have to be named `"Runfile"`.
 
 ---------------------

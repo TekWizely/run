@@ -502,13 +502,18 @@ $ run --runfile /path/to/my/Runfile <command>
 
 #### Via Environment Variable
 
-You can specify a runfile using the `RUNFILE` environment variable:
+You can specify a runfile using the `$RUNFILE` environment variable:
 
 ```
 $ export RUNFILE="/path/to/my/Runfile"
 
 $ run <command>
 ```
+
+For some other interesting uses of `$RUNFILE`, see:
+* [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
+* [Using direnv to auto-configure $RUNFILE](#using-direnv-to-auto-configure-runfile)
+
 
 NOTE: When specifying a runfile, the file does **not** have to be named `"Runfile"`.
 
@@ -823,7 +828,7 @@ _Runfile_
 # EXPORT RUN := ${.RUN}
 # EXPORT RUNFILE := ${.RUNFILE}
 test:
-    "${RUN}" -r "${RUNFILE}" hello
+    "${RUN}" hello
 
 hello:
     echo "Hello, World"
@@ -1085,15 +1090,54 @@ In main mode, help options (`-h` & `--help`) are automatically configured, even 
 
 This means you will need to use `--` in order to pass options through to the main script.
 
+------------------------------------------
+## Using direnv to auto-configure $RUNFILE
+
+A nice hack to make executing run tasks within your project more convenient is to use [direnv](https://direnv.net/) to auto-configure the `$RUNFILE` environment variable:
+
+_create + edit + activate rc file_
+```
+$ cd ~/my-project
+$ direnv edit .
+```
+
+_edit .envrc_
+```
+export RUNFILE="${PWD}/Runfile"
+```
+
+Save & exit.  This will activate _immediately_ but will also activate whenever you `cd` into your project's root folder.
+
+```
+$ cd ~/my-project
+
+direnv: export +RUNFILE
+```
+
+_verify_
+```
+$ echo $RUNFILE
+
+/home/user/my-project/Runfile
+```
+
+With this, you can execute `run <cmd>` from anywhere in your project.
+
 -------------
 ## Installing
 
-### Go Get
+### Via Bingo
 
+[Bingo](https://github.com/TekWizely/bingo) makes it easy to install (and update) golang apps directly from source:
+
+_install_
 ```
-$ GOPATH=/go/path/ go get github.com/tekwizely/run
+$ bingo install github.com/TekWizely/run
+```
 
-$ /go/path/bin/run help
+_update_
+```
+$ bingo update run
 ```
 
 ### Pre-Compiled Binaries

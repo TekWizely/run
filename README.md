@@ -60,6 +60,9 @@ In run, the entire script is executed within a single sub-shell.
    - [Passing Options Directly Through to the Command Script](#passing-options-directly-through-to-the-command-script)
  - [Run Tool Help](#run-tool-help)
  - [Using an Alternative Runfile](#using-an-alternative-runfile)
+   - [Via Command-Line](#via-command-line)
+   - [Via Environment Variable](#via-environment-variable)
+     - [Using Direnv](#using-direnv-to-auto-configure-runfile)
  - [Runfile Variables](#runfile-variables)
    - [Local By Default](#local-by-default)
    - [Exporting Variables](#exporting-variables)
@@ -202,7 +205,7 @@ _list commands_
 ```
 $ run list
 
-panic: Duplicate command: hello-world
+run: Duplicate command: hello-world defined on line 4 -- originally defined on line 1
 ```
 
 ----------------------------
@@ -487,16 +490,32 @@ Note:
   Short options cannot be combined
 ```
 
-------------------------------------
+--------------------------------
 ### Using an Alternative Runfile
+
+#### Via Command Line
 
 You can specify a runfile using the `-r | --runfile` option:
 
 ```
-$ run --runfile /path/to/my/file <command>
+$ run --runfile /path/to/my/Runfile <command>
 ```
 
-When specifying a runfile, the file does **not** have to be named `"Runfile"`.
+#### Via Environment Variable
+
+You can specify a runfile using the `$RUNFILE` environment variable:
+
+```
+$ export RUNFILE="/path/to/my/Runfile"
+
+$ run <command>
+```
+
+For some other interesting uses of `$RUNFILE`, see:
+* [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
+* [Using direnv to auto-configure $RUNFILE](#using-direnv-to-auto-configure-runfile)
+
+NOTE: When specifying a runfile, the file does **not** have to be named `"Runfile"`.
 
 ---------------------
 ### Runfile Variables
@@ -809,7 +828,7 @@ _Runfile_
 # EXPORT RUN := ${.RUN}
 # EXPORT RUNFILE := ${.RUNFILE}
 test:
-    "${RUN}" -r "${RUNFILE}" hello
+    "${RUN}" hello
 
 hello:
     echo "Hello, World"
@@ -1071,15 +1090,54 @@ In main mode, help options (`-h` & `--help`) are automatically configured, even 
 
 This means you will need to use `--` in order to pass options through to the main script.
 
+------------------------------------------
+## Using direnv to auto-configure $RUNFILE
+
+A nice hack to make executing run tasks within your project more convenient is to use [direnv](https://direnv.net/) to auto-configure the `$RUNFILE` environment variable:
+
+_create + edit + activate rc file_
+```
+$ cd ~/my-project
+$ direnv edit .
+```
+
+_edit .envrc_
+```
+export RUNFILE="${PWD}/Runfile"
+```
+
+Save & exit.  This will activate _immediately_ but will also activate whenever you `cd` into your project's root folder.
+
+```
+$ cd ~/my-project
+
+direnv: export +RUNFILE
+```
+
+_verify_
+```
+$ echo $RUNFILE
+
+/home/user/my-project/Runfile
+```
+
+With this, you can execute `run <cmd>` from anywhere in your project.
+
 -------------
 ## Installing
 
-### Go Get
+### Via Bingo
 
+[Bingo](https://github.com/TekWizely/bingo) makes it easy to install (and update) golang apps directly from source:
+
+_install_
 ```
-$ GOPATH=/go/path/ go get github.com/tekwizely/run
+$ bingo install github.com/TekWizely/run
+```
 
-$ /go/path/bin/run help
+_update_
+```
+$ bingo update run
 ```
 
 ### Pre-Compiled Binaries

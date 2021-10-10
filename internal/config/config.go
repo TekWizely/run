@@ -68,7 +68,7 @@ var ShowScriptTmpDir = false
 // ShowCmdShells shows the command shell in the command's help screen
 var ShowCmdShells = false
 
-// EnableRunfileOverride indicates if '-r | --runfile' arguments are supported in the current mode.
+// EnableRunfileOverride indicates if $RUNFILE env var or '-r | --runfile' arguments are supported in the current mode.
 //
 var EnableRunfileOverride = true
 

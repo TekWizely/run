@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -22,6 +23,7 @@ import (
 const (
 	runfileDefault = "Runfile"
 	runfileEnv     = "RUNFILE"
+	runfileRoots   = "RUNFILE_ROOTS"
 )
 
 var (
@@ -128,6 +130,8 @@ func main() {
 			return // Exit early
 		}
 	}
+	var stat os.FileInfo
+	var err error
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
 	//
 	if config.ShebangMode {
@@ -135,12 +139,20 @@ func main() {
 		log.SetPrefix(config.Me + ": ")
 		inputFile = shebangFile // shebang file = runfile
 		config.EnableRunfileOverride = false
+		stat, err = os.Stat(inputFile)
 	} else {
 		parseArgs()
+		// No fallback logic when user specifies file, even if its "Runfile"
+		//
+		if len(inputFile) > 0 {
+			stat, err = os.Stat(inputFile)
+		} else {
+			inputFile, stat, err = tryFindRunfile()
+		}
 	}
 	// Verify file exists
 	//
-	if stat, err := os.Stat(inputFile); err == nil {
+	if err == nil {
 		if !stat.Mode().IsRegular() {
 			log.Printf("Error reading file '%s': File not considered 'regular'\n", inputFile)
 			showUsage() // exits
@@ -150,7 +162,8 @@ func main() {
 			showUsage() // exits
 		}
 	} else {
-		log.Printf("Input file not found: '%s' : Please create the file or specify an alternative", inputFile)
+		// TODO log err?
+		log.Printf("Input file not found: '%s' : Please create the file or specify an alternative", util.DefaultIfEmpty(inputFile, runfileDefault))
 		showUsage() // exits
 	}
 	// Read file into memory
@@ -272,7 +285,7 @@ func parseArgs() {
 	// No $RUNFILE/-r/--runfile support in shebang mode
 	//
 	if config.EnableRunfileOverride {
-		defaultInputFile := util.GetEnvOrDefault(runfileEnv, runfileDefault)
+		defaultInputFile := util.GetEnvOrDefault(runfileEnv, "")
 		flag.StringVar(&inputFile, "runfile", defaultInputFile, "")
 		flag.StringVar(&inputFile, "r", defaultInputFile, "")
 	}
@@ -310,4 +323,93 @@ func readFile(path string) ([]byte, error) {
 	// If we get here, we have an error
 	//
 	return nil, err
+}
+
+// tryFindRunfile attempts to locate a Runfile
+//
+// * Checks ${PWD}/Runfile
+// * Checks $RUNFILE_ROOTS
+//   - Behaves largely similar to GIT_CEILING_DIRECTORIES
+//   - if $PWD is under any entry, then walks up looking for 'Runfile'
+//   - Stops walking up at specified root value
+//   - Does not check root folder itself
+//   - Except for $HOME, which will be checked if present on $RUNFILE_ROOTS
+//
+func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
+	// Look for default Runfile
+	//
+	if stat, err = os.Stat(runfileDefault); err == nil {
+		return runfileDefault, stat, err
+	}
+	// Look for root to possibly walk-up
+	//
+	if runfileRoots := filepath.SplitList(os.Getenv(runfileRoots)); len(runfileRoots) > 0 {
+		// Need current working directory
+		//
+		var wd string
+		if wd, err = os.Getwd(); err != nil {
+			return "", nil, err
+		}
+		wd = path.Clean(wd)
+		if !filepath.IsAbs(wd) {
+			return "", nil, fmt.Errorf("working directory is not absolute: %v", wd)
+		}
+		// If we're already at the root, no need to look further
+		//
+		var wdDir string
+		if wdDir = filepath.Dir(wd); wdDir == wd {
+			return "", nil, errors.New("file not found")
+		}
+		// $HOME gets special treatment as an INCLUSIVE root
+		//
+		var home = os.Getenv("HOME") // not present => ''
+		// Loop over $RUNFILE_ROOTS, stopping at FIRST match
+		//
+		var root string
+		for _, _root := range runfileRoots {
+			_root = path.Clean(_root)
+			if filepath.IsAbs(_root) { // TODO Log false?
+				// $HOME can match exactly
+				//
+				if _root == home && _root == wd {
+					root = _root
+					break
+				}
+				// !$HOME can only match sub-directory
+				//
+				if rel, err := filepath.Rel(_root, wd); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, ".") {
+					root = _root
+					break
+				}
+			}
+		}
+		// Did we find one?
+		//
+		if len(root) > 0 {
+			// We know current wd doesn't have it, so let's start at parent
+			//
+			wd = wdDir
+			// In general, we don't check root proper, so stop if we get there
+			//
+			var rel string
+			for rel, err = filepath.Rel(root, wd); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, "."); rel, err = filepath.Rel(root, wd) {
+				inputFile = filepath.Join(wd, runfileDefault)
+				if stat, err = os.Stat(inputFile); err == nil {
+					return
+				}
+				wd = path.Dir(wd)
+			}
+			// root exclusion exemption for $HOME
+			//
+			if root == home && err == nil && rel == "." {
+				inputFile = filepath.Join(wd, runfileDefault)
+				if stat, err = os.Stat(inputFile); err == nil {
+					return
+				}
+			}
+		}
+	}
+	// Nothing else to try, sorry dude
+	//
+	return "", nil, errors.New("file not found")
 }

@@ -61,8 +61,10 @@ In run, the entire script is executed within a single sub-shell.
  - [Run Tool Help](#run-tool-help)
  - [Using an Alternative Runfile](#using-an-alternative-runfile)
    - [Via Command-Line](#via-command-line)
-   - [Via Environment Variable](#via-environment-variable)
-     - [Using Direnv](#using-direnv-to-auto-configure-runfile)
+   - [Via Environment Variables](#via-environment-variables)
+     - [`$RUNFILE`](#runfile)
+       - [Using Direnv](#using-direnv-to-auto-configure-runfile)
+     - [`$RUNFILE_ROOTS`](#runfile_roots)
  - [Runfile Variables](#runfile-variables)
    - [Local By Default](#local-by-default)
    - [Exporting Variables](#exporting-variables)
@@ -501,7 +503,11 @@ You can specify a runfile using the `-r | --runfile` option:
 $ run --runfile /path/to/my/Runfile <command>
 ```
 
-#### Via Environment Variable
+NOTE: When specifying a runfile, the file does **not** have to be named `"Runfile"`.
+
+#### Via Environment Variables
+
+##### $RUNFILE
 
 You can specify a runfile using the `$RUNFILE` environment variable:
 
@@ -516,6 +522,30 @@ For some other interesting uses of `$RUNFILE`, see:
 * [Using direnv to auto-configure $RUNFILE](#using-direnv-to-auto-configure-runfile)
 
 NOTE: When specifying a runfile, the file does **not** have to be named `"Runfile"`.
+
+##### $RUNFILE_ROOTS
+
+You can instruct run to look _up_ the directory path in search of a runfile.
+
+You do this using the `$RUNFILE_ROOTS` path variable.
+
+* `$RUNFILE_ROOTS` is treated as a list of path entries (using standard os path separator)
+* Behaves largely similar to [GIT_CEILING_DIRECTORIES](https://git-scm.com/docs/git#Documentation/git.txt-codeGITCEILINGDIRECTORIEScode)
+* If `$PWD` is a child of a root entry, run walks-up looking for `Runfile`
+* Roots themselves are generally treated as _exclusive_ (ie not checked)
+* `$HOME`, if a configured root, is treated as _inclusive_ (ie it **is** checked)
+
+_general usage_
+
+    export RUNFILE_ROOTS="${HOME}"  # Will walk up to $HOME (inclusively)
+
+_most permissive_
+
+    export RUNFILE_ROOTS="/"  # Will walk up to / (exclusively)
+
+NOTE: `$HOME` is given special treatment to support the case where a project is given its own _user_ account and lives in the _home_ folder of that user.
+
+For the case of creating globally available tasks, see the [Special Modes](#special-modes) section.
 
 ---------------------
 ### Runfile Variables

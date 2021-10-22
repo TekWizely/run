@@ -24,7 +24,7 @@ repos:
     #
     # Staged Files:
     #   Unless configured to "always_run" (see below), hooks ONLY run when
-    #   maching file types (usually *.go) are staged.
+    #   matching file types (usually *.go) are staged.
     #
     # File-Based Hooks:
     #   By default, hooks run against matching staged files individually.

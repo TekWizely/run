@@ -62,7 +62,7 @@ func (s *Scope) PutVar(key, value string) {
 	s.Vars[key] = value
 }
 
-// AddExport adds an var name to the list of exports
+// AddExport adds a var name to the list of exports
 //
 func (s *Scope) AddExport(key string) {
 	s.Exports = append(s.Exports, key)
@@ -74,7 +74,7 @@ func (s *Scope) GetExports() []string {
 	return s.Exports
 }
 
-// AddAssert adds an assert to the list of asserts
+// AddAssert adds an assertion to the list of asserts
 //
 func (s *Scope) AddAssert(assert *Assert) {
 	s.Asserts = append(s.Asserts, assert)

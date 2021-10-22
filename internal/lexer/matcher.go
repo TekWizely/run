@@ -44,7 +44,7 @@ func matchZeroOrOne(l *lexer.Lexer, fn runeFn) bool {
 	return true
 }
 
-// matchZeroOrMore attempts to match zero or more of the specified predicate, ruturning succcess regardless.
+// matchZeroOrMore attempts to match zero or more of the specified predicate, returning success regardless.
 //
 func matchZeroOrMore(l *lexer.Lexer, fn runeFn) bool {
 	for l.CanPeek(1) && fn(l.Peek(1)) {

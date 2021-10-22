@@ -83,8 +83,8 @@ func (c *RunCmd) Shell() string {
 	return shell
 }
 
-// EnableHelp returns whether or not a help screen should be shown for a command.
-// Returns false if there isn't any custom informaiton to display.
+// EnableHelp returns whether a help screen should be shown for a command.
+// Returns false if there isn't any custom information to display.
 //
 func (c *RunCmd) EnableHelp() bool {
 	return len(c.Config.Desc) > 0 || len(c.Config.Usages) > 0 || len(c.Config.Opts) > 0

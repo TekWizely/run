@@ -87,10 +87,10 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Comment
 	//
 	case matchRune(l, runeHash):
-		// May be a hash-line
+		// Might be a hash-line
 		//
 		if matchOneOrMore(l, isHash) {
-			// May be a single line doc comment
+			// Might be a single line doc comment
 			//
 			if matchOneOrMore(l, isSpaceOrTab) {
 				l.Clear()
@@ -287,7 +287,7 @@ func LexAssertMessage(_ *LexContext, l *lexer.Lexer) LexFn {
 // lexTestString
 //
 func lexTestString(ctx *LexContext, l *lexer.Lexer) LexFn {
-	//noinspection GoImportUsedAsName
+	//goland:noinspection GoImportUsedAsName
 	var (
 		token     token.Type
 		elementFn LexFn
@@ -868,7 +868,7 @@ func lexCmdScriptLine(_ *LexContext, l *lexer.Lexer) LexFn {
 			l.Clear() // Discard the comment block
 			return lexCmdScriptLine
 		}
-		m.Apply() // End script before comment block
+		m.Apply() // Consider script as ending before the comment block, re-parse comment block later
 		l.EmitType(TokenScriptEnd)
 		return nil
 	}
@@ -913,7 +913,7 @@ func matchNewline(l *lexer.Lexer) bool {
 	return false
 }
 
-// matchNewlineOrEOF tries to match a newline or EOF, returnning success or failure.
+// matchNewlineOrEOF tries to match a newline or EOF, returning success or failure.
 //
 func matchNewlineOrEOF(l *lexer.Lexer) bool {
 	if matchNewline(l) {

@@ -621,7 +621,7 @@ func LexDocBlockAttr(_ *LexContext, l *lexer.Lexer) LexFn {
 			l.EmitErrorf("Unrecognized command attribute: %s", name)
 			return nil
 		}
-		l.EmitError("Expecting command attribute")
+		l.EmitError("expecting command attribute")
 		return nil
 	}
 	m.Apply()
@@ -652,7 +652,7 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	// ID
 	//
 	if !matchID(l) {
-		l.EmitError("Expecting option name")
+		l.EmitError("expecting option name")
 		return nil
 	}
 	l.EmitToken(TokenConfigOptName)
@@ -663,7 +663,7 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 
 	// First '-' : Might be short or long
 	//
-	expectRune(l, runeDash, "Expecting '-'")
+	expectRune(l, runeDash, "expecting '-'")
 	l.Clear()
 
 	expectLong := true
@@ -686,7 +686,7 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 			ignoreSpace(l)
 			// First '-'
 			//
-			expectRune(l, runeDash, "Expecting '-'")
+			expectRune(l, runeDash, "expecting '-'")
 			l.Clear()
 		}
 	}
@@ -696,12 +696,12 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	if expectLong {
 		// Second '-'
 		//
-		expectRune(l, runeDash, "Expecting '-'")
+		expectRune(l, runeDash, "expecting '-'")
 		l.Clear()
 		if matchOneOrMore(l, isAlphaNum) {
 			l.EmitToken(TokenConfigOptLong)
 		} else {
-			l.EmitError("Expecting long flag name")
+			l.EmitError("expecting long flag name")
 		}
 	}
 
@@ -715,7 +715,7 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 		l.Clear()
 		matchOneOrMore(l, isConfigOptValue)
 		l.EmitToken(TokenConfigOptValue)
-		expectRune(l, runeRAngle, "Expecting '>'")
+		expectRune(l, runeRAngle, "expecting '>'")
 		l.Clear()
 	}
 
@@ -746,7 +746,7 @@ func LexCmdShellName(_ *LexContext, l *lexer.Lexer) LexFn {
 func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
 	if !matchID(l) {
-		l.EmitError("Expecting variable name")
+		l.EmitError("expecting variable name")
 		return nil
 	}
 	l.EmitToken(TokenID)
@@ -760,7 +760,7 @@ func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 			l.EmitType(TokenComma)
 			ignoreSpace(l)
 			if !matchID(l) {
-				l.EmitError("Expecting variable name")
+				l.EmitError("expecting variable name")
 				return nil
 			}
 			l.EmitToken(TokenID)
@@ -773,12 +773,12 @@ func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	// ':='
 	//
 	case matchRune(l, runeColon):
-		expectRune(l, runeEquals, "Expecting '='")
+		expectRune(l, runeEquals, "expecting '='")
 		l.EmitType(TokenEquals)
 	// '?='
 	//
 	case matchRune(l, runeQMark):
-		expectRune(l, runeEquals, "Expecting '='")
+		expectRune(l, runeEquals, "expecting '='")
 		l.EmitType(TokenQMarkEquals)
 	default:
 		// No default

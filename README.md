@@ -758,7 +758,7 @@ Assertions have the following syntax:
 ASSERT <condition> [ "<error message>" | '<error message>' ]
 ```
 
-*Note:* The error message is optional and will default to `"Assertion failed"` if not provided
+*Note:* The error message is optional and will default to `"assertion failed"` if not provided
 
 #### Condition
 
@@ -805,11 +805,11 @@ Hello, World
 
 $ run newman
 
-run: Variable HELLO not defined
+run: ERROR: Variable HELLO not defined
 
 $ run name
 
-run: Variable HELLO not defined
+run: ERROR: Variable HELLO not defined
 ```
 
 _example with HELLO_

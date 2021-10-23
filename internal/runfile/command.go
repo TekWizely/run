@@ -183,28 +183,19 @@ func (a *boolOpt) IsBoolFlag() bool {
 	return true
 }
 
-// evaluateCmdOpts
+// evaluateCmdOpts returns (args,0) or (nil,!0)
 //
-func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
+func evaluateCmdOpts(cmd *RunCmd, args []string) ([]string, int) {
 	// If no options defined, pass all args through to command script
 	// NOTE: For MainMode we still define options, mainly for --help
 	//
 	if len(cmd.Config.Opts) == 0 && !config.MainMode {
-		return args
+		return args, 0
 	}
 	flags := flag.NewFlagSet(cmd.Name, flag.ExitOnError)
-	// Invoked if error parsing arguments.
-	//
-	flags.Usage = func() {
-		// Show less verbose usage.
-		// User can use -h/--help for full desc+usage
-		//
-		showCmdUsage(cmd)
-		os.Exit(2)
-	}
 	var (
-		stringVals = make(map[string]*stringOpt)
-		boolVals   = make(map[string]*boolOpt)
+		stringValues = make(map[string]*stringOpt)
+		boolValues   = make(map[string]*boolOpt)
 	)
 	// Help : -h, --help
 	//
@@ -228,12 +219,12 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
 		if len(opt.Value) > 0 {
 			var s = new(string)
 			var sOpt = &stringOpt{name: optName, value: s}
-			stringVals[optName] = sOpt
+			stringValues[optName] = sOpt
 			flagOpt = sOpt
 		} else {
 			var b = new(bool)
 			var bOpt = &boolOpt{name: optName, value: b}
-			boolVals[optName] = bOpt
+			boolValues[optName] = bOpt
 			flagOpt = bOpt
 		}
 		// Short?
@@ -253,38 +244,52 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) []string {
 	if !hasHelpLong {
 		flags.BoolVar(&help, "help", help, "")
 	}
+	exitCode := 0
+	// Invoked if error parsing args - sets exit code 2
+	//
+	flags.Usage = func() {
+		// Show less verbose usage.
+		// User can use -h/--help for full desc+usage
+		//
+		showCmdUsage(cmd)
+		exitCode = 2
+	}
 	_ = flags.Parse(args)
+	if exitCode != 0 {
+		return nil, exitCode
+	}
 	// User explicitly asked for help
 	//
 	if help {
 		// Show full help details
 		//
 		ShowCmdHelp(cmd)
-		os.Exit(2)
+		return nil, 2
 	}
 	// TODO Maybe make args property instead of stashing in vars?
-	for name, value := range stringVals {
+	for name, value := range stringValues {
 		cmd.Scope.Vars[name] = value.String()
 		cmd.Scope.AddExport(name)
 	}
-	for name, value := range boolVals {
+	for name, value := range boolValues {
 		cmd.Scope.Vars[name] = value.String()
 		cmd.Scope.AddExport(name)
 	}
-	return flags.Args()
+	return flags.Args(), 0
 }
 
 // ShowCmdHelp shows cmd, desc, usage and opts
 //
+//goland:noinspection GoUnhandledErrorResult // fmt.*
 func ShowCmdHelp(cmd *RunCmd) {
 	var shell = ""
-	//noinspection GoBoolExpressions
+	//goland:noinspection GoBoolExpressions
 	if config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
 
 	if !cmd.EnableHelp() {
-		fmt.Fprintf(config.ErrOut, "%s%s: No help available.\n", cmd.Name, shell)
+		fmt.Fprintf(config.ErrOut, "%s%s: no help available.\n", cmd.Name, shell)
 		return
 	}
 	fmt.Fprintf(config.ErrOut, "%s%s:\n", cmd.Name, shell)
@@ -302,14 +307,15 @@ func ShowCmdHelp(cmd *RunCmd) {
 
 // ShowCmdUsage show only usage + opts
 //
+//goland:noinspection GoUnhandledErrorResult // fmt.*
 func showCmdUsage(cmd *RunCmd) {
 	var shell = ""
-	//noinspection GoBoolExpressions
-	if config.ShowCmdShells {
+	if //goland:noinspection GoBoolExpressions
+	config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
 	if !cmd.EnableHelp() {
-		fmt.Fprintf(config.ErrOut, "%s%s: No help available.\n", cmd.Name, shell)
+		fmt.Fprintf(config.ErrOut, "%s%s: no help available.\n", cmd.Name, shell)
 		return
 	}
 	// Usages
@@ -377,7 +383,7 @@ func showCmdUsage(cmd *RunCmd) {
 			if opt.Short != 0 && opt.Long == "" && opt.Value == "" {
 				b.WriteString("    ")
 			} else {
-				b.WriteString("\n        ")
+				b.WriteString("\n        ") // Leading \n
 			}
 			b.WriteString(opt.Desc)
 		}
@@ -388,7 +394,7 @@ func showCmdUsage(cmd *RunCmd) {
 // ListCommands prints the list of commands read from the runfile
 //
 func ListCommands() {
-	fmt.Fprintln(config.ErrOut, "Commands:")
+	_, _ = fmt.Fprintln(config.ErrOut, "Commands:")
 	padLen := 0
 	for _, cmd := range config.CommandList {
 		if len(cmd.Name) > padLen {
@@ -396,50 +402,53 @@ func ListCommands() {
 		}
 	}
 	for _, cmd := range config.CommandList {
-		fmt.Fprintf(config.ErrOut, "  %s%s    %s\n", cmd.Name, strings.Repeat(" ", padLen-len(cmd.Name)), cmd.Title)
+		_, _ = fmt.Fprintf(config.ErrOut, "  %s%s    %s\n", cmd.Name, strings.Repeat(" ", padLen-len(cmd.Name)), cmd.Title)
 	}
-	pad := strings.Repeat(" ", len(config.Me)-1)
-	runfileOpt := ""
-	if config.EnableRunfileOverride {
-		runfileOpt = "[-r runfile] "
-	}
-	fmt.Fprintf(config.ErrOut, "Usage:\n")
-	fmt.Fprintf(config.ErrOut, "       %s %shelp <command>\n", config.Me, runfileOpt)
-	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s %s<command> [option ...]\n", config.Me, runfileOpt)
-	fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
 }
 
-// RunHelp shows either the default help or help for the specified command.
+// RunHelp shows help for the specified command.
+// On success, returns exit code 0
+// If command not found, prints error message and returns exit code 2
+// If no command given, prints usage message and returns exit code 2
 //
-func RunHelp(_ *Runfile) {
-	cmdName := "help"
-	// Command?
-	//
+func RunHelp() int {
+	var cmdName string
 	if len(os.Args) > 0 {
 		cmdName = os.Args[0]
 		os.Args = os.Args[1:]
 	}
-	cmdName = strings.ToLower(cmdName)
-	if c, ok := config.CommandMap[cmdName]; ok {
-		c.Help()
-	} else {
-		log.Printf("command not found: %s", cmdName)
+	if len(cmdName) > 0 {
+		cmdName = strings.ToLower(cmdName)
+		if c, ok := config.CommandMap[cmdName]; ok {
+			c.Help()
+			return 0
+		}
+		// NOTE: No further 'see' messages when help invoked *with* a command
+		//
+		log.Printf("command not found: %s\n\n", cmdName) // 2 x \n
 		ListCommands()
+	} else {
+		_, _ = fmt.Fprintf(config.ErrOut, "usage: '%s help <command>'\n\n", config.Me) // 2 x \n
+		ListCommands()
+		_, _ = fmt.Fprintf(config.ErrOut, "\nsee '%s --help' for more information\n", config.Me) // Leading \n
 	}
-	os.Exit(2)
+	return 2
 }
 
-// RunCommand executes a command.
+// RunCommand executes a command returning an exit code
 //
 func RunCommand(cmd *RunCmd) int {
-	os.Args = evaluateCmdOpts(cmd, os.Args)
+	exitCode := 0
+	os.Args, exitCode = evaluateCmdOpts(cmd, os.Args)
+	if exitCode != 0 {
+		return exitCode
+	}
 	env := make(map[string]string)
 	for _, name := range cmd.Scope.GetExports() {
 		if value, ok := cmd.Scope.GetVar(name); ok {
 			env[name] = value
 		} else {
-			log.Println("Warning: exported variable not defined: ", name)
+			log.Printf("WARNING: exported variable not defined: '%s'", name)
 		}
 	}
 	// Check Asserts - Uses global .SHELL
@@ -450,14 +459,16 @@ func RunCommand(cmd *RunCmd) int {
 	}
 	for _, assert := range cmd.Scope.Asserts {
 		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
-			runFile := path.Base(config.RunFile)
+			runFile := path.Base(config.Runfile)
 			// Print message if one configured
 			//
 			if len(assert.Message) > 0 {
-				log.Fatalf("%s: %s", runFile, assert.Message)
+				log.Printf("%s: %s", runFile, assert.Message)
 			} else {
-				log.Fatalf("%s:%d: Assertion failed", runFile, assert.Line)
+				log.Printf("%s:%d: assertion failed", runFile, assert.Line)
 			}
+			// ~= log.Fatal
+			return 1
 		}
 	}
 	// Execute script - Uses cmd shell

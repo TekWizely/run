@@ -17,7 +17,7 @@ func ProcessAST(ast *Ast) *runfile.Runfile {
 	//
 	rf.Scope.PutAttr(".SHELL", config.DefaultShell)
 	rf.Scope.PutAttr(".RUN", config.RunBin)
-	rf.Scope.PutAttr(".RUNFILE", config.RunFile)
+	rf.Scope.PutAttr(".RUNFILE", config.RunfileAbs)
 	for _, n := range ast.nodes {
 		n.Apply(rf)
 	}
@@ -457,7 +457,7 @@ func (a *ScopeValueShell) Apply(s *runfile.Scope) string {
 		if value, ok := s.GetVar(name); ok {
 			env[name] = value
 		} else {
-			log.Println("Warning: exported variable not defined: ", name)
+			log.Printf("WARNING: exported variable not defined: '%s'", name)
 		}
 	}
 	capturedOutput := &strings.Builder{}

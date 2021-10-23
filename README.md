@@ -105,21 +105,16 @@ $ run list
 
 Commands:
   list       (builtin) List available commands
-  help       (builtin) Show Help for a command
-  version    (builtin) Show Run version
+  help       (builtin) Show help for a command
+  version    (builtin) Show run version
   hello
-  Usage:
-         run [-r runfile] help <command>
-            (show help for <command>)
-    or   run [-r runfile] <command> [option ...]
-            (run <command>)
 ```
 
 _show help for hello command_
 ```
 $ run help hello
 
-hello: No help available.
+hello: no help available.
 ```
 
 _invoke hello command_
@@ -186,7 +181,7 @@ _show help for Hello-World command_
 ```
 $ run help Hello-World
 
-Hello-World: No help available.
+Hello-World: no help available.
 ```
 
 ###### Duplicate Command Names
@@ -207,7 +202,7 @@ _list commands_
 ```
 $ run list
 
-run: Duplicate command: hello-world defined on line 4 -- originally defined on line 1
+run: duplicate command: hello-world defined on line 4 -- originally defined on line 1
 ```
 
 ----------------------------
@@ -230,8 +225,8 @@ $ run list
 
 Commands:
   list       (builtin) List available commands
-  help       (builtin) Show Help for a command
-  version    (builtin) Show Run version
+  help       (builtin) Show help for a command
+  version    (builtin) Show run version
   hello      Hello world example.
   ...
 ```
@@ -265,8 +260,8 @@ $ run list
 
 Commands:
   list       (builtin) List available commands
-  help       (builtin) Show Help for a command
-  version    (builtin) Show Run version
+  help       (builtin) Show help for a command
+  version    (builtin) Show run version
   hello      Hello world example.
   ...
 ```
@@ -453,9 +448,9 @@ echo:
 
 _output_
 ```
-$ run echo -a myarg -- -h --help Hello Newman
+$ run echo -a my-arg -- -h --help Hello Newman
 
-ARG = myarg
+ARG = my-arg
 script arguments = -h --help Hello Newman
 ```
 
@@ -464,25 +459,22 @@ Notice the `'--'` in the argument list - Run will stop parsing options when it e
 -----------------
 ### Run Tool Help
 
-Invoking the `help` command with no other arguments shows the help page for the run tool itself.
+Invoking `-h` or `--help` with no command shows the help page for the run tool itself.
 
 ```
-$ run help
+$ run --help
 
 Usage:
-       run -h | --help
-          (show help)
-  or   run [-r runfile] list
-          (list commands)
-  or   run [-r runfile] help <command>
-          (show help for <command>)
-  or   run [-r runfile] <command> [option ...]
+       run <command> [option ...]
           (run <command>)
+  or   run list
+          (list commands)
+  or   run help <command>
+          (show help for <command>)
 Options:
-  -h, --help
-        Show help screen
   -r, --runfile <file>
-        Specify runfile (default='Runfile')
+        Specify runfile (default='${RUNFILE:-Runfile}')
+        ex: run -r /my/runfile list
 Note:
   Options accept '-' | '--'
   Values can be given as:
@@ -689,7 +681,7 @@ _output_
 ```
 $ run hello
 
-run: Warning: exported variable not defined:  HELLO
+run: WARNING: exported variable not defined: 'HELLO'
 Hello, world
 ```
 
@@ -838,7 +830,7 @@ $ HELLO=Hello NAME=Everybody run name
 Hello, Everybody
 ```
 
-*Note:* Assertions only apply to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
+*Note:* Assertions apply only to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
 
 --------------------------------------
 ### Invoking Other Commands & Runfiles
@@ -876,7 +868,7 @@ Hello, World
 
 Run's default shell is `'sh'`, but you can specify other shells.
 
-All of the standard shells should work.
+All the standard shells should work.
 
 #### Per-Command Shell Config
 
@@ -959,7 +951,7 @@ hello:
 
 ##### Script Execution: Direct
 
-*NOTE:* The `#!` executor does not use `/user/bin/env` to invoke your script.  Instead it attempts to make the temporary script file executable then invoke it directly.
+*NOTE:* The `#!` executor does not use `/user/bin/env` to invoke your script.  Instead, it attempts to make the temporary script file executable then invoke it directly.
 
 
 -----------------
@@ -1016,14 +1008,12 @@ _shebang mode help example_
 $ ./runfile.sh help
 
 Usage:
-       runfile.sh -h | --help
-                 (show help)
+       runfile.sh <command> [option ...]
+                 (run <command>)
   or   runfile.sh list
                  (list commands)
   or   runfile.sh help <command>
                  (show help for <command>)
-  or   runfile.sh <command> [option ...]
-                 (run <command>)
   ...
 ```
 
@@ -1034,14 +1024,9 @@ $ ./runfile.sh list
 
 Commands:
   list           (builtin) List available commands
-  help           (builtin) Show Help for a command
-  run-version    (builtin) Show Run version
+  help           (builtin) Show help for a command
+  run-version    (builtin) Show run version
   hello          Hello example using shebang mode
-Usage:
-       runfile.sh help <command>
-                 (show help for <command>)
-  or   runfile.sh <command> [option ...]
-                 (run <command>)
 ```
 
 #### Version command name
@@ -1076,7 +1061,7 @@ runfile.sh v1.2.3
 
 $ ./runfile.sh run-version
 
-run v0.0.0
+runfile.sh is powered by run v0.0.0. learn more at https://github.com/TekWizely/run
 ```
 
 -------------

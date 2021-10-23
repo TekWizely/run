@@ -24,13 +24,17 @@ func executeScript(shell string, script []string, args []string, env map[string]
 	//
 	tmpFile, err := tmpFile(fmt.Sprintf("%s-%s-*.sh", prefix, shell))
 	if err != nil {
-		log.Fatal(err)
+		// ~= log.Fatal
+		log.Print(err)
+		return 1
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	for _, line := range script {
 		if _, err = tmpFile.Write([]byte(line)); err != nil {
-			log.Fatal(err)
+			// ~= log.Fatal
+			log.Print(err)
+			return 1
 		}
 	}
 	var cmd *exec.Cmd
@@ -42,15 +46,21 @@ func executeScript(shell string, script []string, args []string, env map[string]
 		//
 		var stat os.FileInfo
 		if stat, err = tmpFile.Stat(); err != nil {
-			log.Fatal(err)
+			// ~= log.Fatal
+			log.Print(err)
+			return 1
 		}
 		// Add user-executable bit
 		//
 		if err = tmpFile.Chmod(stat.Mode() | 0100); err != nil {
-			log.Fatal(err)
+			// ~= log.Fatal
+			log.Print(err)
+			return 1
 		}
 		if err = tmpFile.Close(); err != nil {
-			log.Fatal(err)
+			// ~= log.Fatal
+			log.Print(err)
+			return 1
 		}
 
 		cmd = exec.Command(tmpFile.Name(), args...)
@@ -102,8 +112,9 @@ func tmpFile(pattern string) (*os.File, error) {
 	if tmpDir == "" {
 		var err error
 		tmpDir, err = ioutil.TempDir("", "runfile-")
+		//goland:noinspection GoBoolExpressions
 		if config.ShowScriptTmpDir {
-			fmt.Fprintln(config.ErrOut, "temp dir: ", tmpDir)
+			_, _ = fmt.Fprintln(config.ErrOut, "temp dir: ", tmpDir)
 		}
 		if err != nil {
 			return nil, err
@@ -116,6 +127,7 @@ func tmpFile(pattern string) (*os.File, error) {
 // and any files within it.
 //
 func CleanupTemporaryDir() error {
+	//goland:noinspection GoBoolExpressions
 	if tmpDir != "" && !config.ShowScriptTmpDir {
 		return os.RemoveAll(tmpDir)
 	}

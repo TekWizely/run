@@ -192,7 +192,7 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) ([]string, int) {
 	if len(cmd.Config.Opts) == 0 && !config.MainMode {
 		return args, 0
 	}
-	flags := flag.NewFlagSet(cmd.Name, flag.ExitOnError)
+	flags := flag.NewFlagSet(cmd.Name, flag.ContinueOnError)
 	var (
 		stringValues = make(map[string]*stringOpt)
 		boolValues   = make(map[string]*boolOpt)
@@ -310,8 +310,8 @@ func ShowCmdHelp(cmd *RunCmd) {
 //goland:noinspection GoUnhandledErrorResult // fmt.*
 func showCmdUsage(cmd *RunCmd) {
 	var shell = ""
-	if //goland:noinspection GoBoolExpressions
-	config.ShowCmdShells {
+	//goland:noinspection GoBoolExpressions
+	if config.ShowCmdShells {
 		shell = fmt.Sprintf(" (%s)", cmd.Shell())
 	}
 	if !cmd.EnableHelp() {

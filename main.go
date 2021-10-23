@@ -251,10 +251,14 @@ func main() {
 	config.CommandList = append(config.CommandList, versionCmd)
 	builtinCnt := len(config.CommandList)
 
+	// Register runfile commands, if loaded
+	//
 	if rf != nil {
 		commandLines := make(map[string]int)
 		for _, rfCmd := range rf.Cmds {
 			name := strings.ToLower(rfCmd.Name) // normalize
+			// Look for dupes
+			//
 			if _, ok := config.CommandMap[name]; ok {
 				if commandLine, ok := commandLines[name]; ok {
 					panic(fmt.Sprintf("duplicate command: %s defined on line %d -- originally defined on line %d", name, rfCmd.Line, commandLine))
@@ -262,6 +266,8 @@ func main() {
 					panic(fmt.Sprintf("duplicate command: %s defined on line %d -- this command is built-in", name, rfCmd.Line))
 				}
 			}
+			// Register cmd
+			//
 			commandLines[name] = rfCmd.Line
 			cmd := &config.Command{
 				Name:   rfCmd.Name,
@@ -336,8 +342,10 @@ func main() {
 }
 
 func parseArgs() int {
-	var showHelp bool
+	flag.CommandLine.Init(config.Me, flag.ContinueOnError)
 	flag.CommandLine.SetOutput(config.ErrOut)
+
+	var showHelp bool
 	flag.BoolVar(&showHelp, "help", false, "")
 	flag.BoolVar(&showHelp, "h", false, "")
 	// No $RUNFILE/-r/--runfile support in shebang mode

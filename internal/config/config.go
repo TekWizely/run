@@ -38,7 +38,7 @@ var MainMode bool
 //
 var ErrOut io.Writer
 
-// ErrShell is an Error message for missing .SHELL attribute
+// ErrShell is an Error message for missing '.SHELL' attribute
 //
 var ErrShell = errors.New(".SHELL not defined")
 
@@ -46,7 +46,7 @@ var ErrShell = errors.New(".SHELL not defined")
 //
 var CommandList []*Command
 
-// CommandMap stores a map of commands, keyed by the command name (lowercased)
+// CommandMap stores a map of commands, keyed by the command name (lower-cased)
 //
 var CommandMap = make(map[string]*Command)
 
@@ -54,8 +54,21 @@ var CommandMap = make(map[string]*Command)
 //
 var RunBin string
 
-// RunFile holds the absolute path to the current Runfile.
-var RunFile string
+// Runfile holds the (possibly relative) path to the current Runfile.
+//
+var Runfile string
+
+// RunfileAbs holds the absolute path to the current Runfile.
+//
+var RunfileAbs string
+
+// RunfileIsLoaded is true if the runfile has been successfully loaded
+//
+var RunfileIsLoaded bool
+
+// RunfileIsDefault is true if the current Runfile is the default "Runfile"
+//
+var RunfileIsDefault bool
 
 // EnableFnTrace shows parser/lexer fn call/stack
 //
@@ -66,6 +79,7 @@ var EnableFnTrace = false
 var ShowScriptTmpDir = false
 
 // ShowCmdShells shows the command shell in the command's help screen
+//
 var ShowCmdShells = false
 
 // EnableRunfileOverride indicates if $RUNFILE env var or '-r | --runfile' arguments are supported in the current mode.
@@ -75,7 +89,7 @@ var EnableRunfileOverride = true
 // TraceFn logs lexer transitions
 //
 func TraceFn(msg string, i interface{}) {
-	//noinspection GoBoolExpressions
+	//goland:noinspection GoBoolExpressions
 	if EnableFnTrace {
 		fnName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 		log.Println(msg, ":", fnName)

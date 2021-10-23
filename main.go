@@ -27,34 +27,35 @@ const (
 )
 
 var (
-	inputFile string
 	hidePanic = true // Hide full trace on panics
 )
 
-// showUsage exits with error code 2.
+// showUsageHint prints a terse usage string.
 //
-//goland:noinspection GoUnhandledErrorResult
-func showUsage() {
-	runfileOpt := ""
-	if config.EnableRunfileOverride {
-		runfileOpt = "[-r runfile] " // needs trailing space
-	}
+func showUsageHint() {
+	_, _ = fmt.Fprintf(config.ErrOut, "see '%s --help' for more information\n", config.Me)
+}
+
+// showRunHelp
+//
+//goland:noinspection GoUnhandledErrorResult // fmt.*
+func showRunHelp() {
 	pad := strings.Repeat(" ", len(config.Me)-1)
 	fmt.Fprintf(config.ErrOut, "Usage:\n")
-	fmt.Fprintf(config.ErrOut, "       %s -h | --help\n", config.Me)
-	fmt.Fprintf(config.ErrOut, "       %s (show help)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s %slist\n", config.Me, runfileOpt)
-	fmt.Fprintf(config.ErrOut, "       %s (list commands)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s %shelp <command>\n", config.Me, runfileOpt)
-	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
-	fmt.Fprintf(config.ErrOut, "  or   %s %s<command> [option ...]\n", config.Me, runfileOpt)
+	fmt.Fprintf(config.ErrOut, "       %s <command> [option ...]\n", config.Me)
 	fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
+
+	fmt.Fprintf(config.ErrOut, "  or   %s list\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (list commands)\n", pad)
+
+	fmt.Fprintf(config.ErrOut, "  or   %s help <command>\n", config.Me)
+	fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n", pad)
+
 	fmt.Fprintln(config.ErrOut, "Options:")
-	fmt.Fprintln(config.ErrOut, "  -h, --help")
-	fmt.Fprintln(config.ErrOut, "        Show help screen")
 	if config.EnableRunfileOverride {
 		fmt.Fprintln(config.ErrOut, "  -r, --runfile <file>")
 		fmt.Fprintf(config.ErrOut, "        Specify runfile (default='${%s:-%s}')\n", runfileEnv, runfileDefault)
+		fmt.Fprint(config.ErrOut, "        ex: run -r /my/runfile list\n")
 	}
 	fmt.Fprintln(config.ErrOut, "Note:")
 	fmt.Fprintln(config.ErrOut, "  Options accept '-' | '--'")
@@ -63,37 +64,44 @@ func showUsage() {
 	fmt.Fprintln(config.ErrOut, "  Flags (booleans) can be given as:")
 	fmt.Fprintln(config.ErrOut, "        -f | -f=true | -f=false")
 	fmt.Fprintln(config.ErrOut, "  Short options cannot be combined")
-	// flag.PrintDefaults()
-	os.Exit(2)
+	if !config.ShebangMode {
+		fmt.Fprintln(config.ErrOut, "\nLearn more about run at https://github.com/TekWizely/run") // Leading \n
+	}
 }
 
 // showVersion
 //
 func showVersion() {
-	fmt.Println("run", versionString())
+	if config.ShebangMode {
+		fmt.Printf("%s is powered by run %s. learn more at https://github.com/TekWizely/run\n", config.Me, versionString())
+	} else {
+		fmt.Println("run", versionString())
+	}
 }
 
 // main
 //
+//goland:noinspection GoUnhandledErrorResult // fmt.*
 func main() {
-	// NOTE: Only set this from exit status of run commands (builtins ok too)
-	//       Actual errors in Run proper should invoke os.Exit directly
-	cmdExitCode := 0
+	// NOTE: Instead of os.Exit, set exitCode then return
+	//
+	exitCode := 0
 	// First defer in = last defer out
 	//
 	defer func() {
 		// Cleanup temp folder/files
 		//
 		_ = exec.CleanupTemporaryDir() // TODO Message on error?
-		// Propagate cmd exit code if non-0
+		// Propagate exit code if non-0
 		// os.Exit aborts program immediately, so delay as long as possible
 		//
-		if cmdExitCode != 0 {
-			os.Exit(cmdExitCode)
+		if exitCode != 0 {
+			os.Exit(exitCode)
 		}
 	}()
 
 	config.ErrOut = os.Stderr
+
 	if execPath, err := os.Executable(); err != nil { // Returns abs path on success
 		config.RunBin = execPath
 	} else {
@@ -103,14 +111,16 @@ func main() {
 	// Configure logging
 	//
 	log.SetFlags(0)
-	log.SetPrefix(config.Me + ": ")
+	log.SetPrefix(config.Me + ": ") // May change for Shebang Mode
 	// Capture panics as log messages
 	//
-	//noinspection GoBoolExpressions
+	//goland:noinspection GoBoolExpressions
 	if hidePanic {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Fatal(r)
+				// ~= log.Fatal
+				log.Print(r)
+				exitCode = 1
 			}
 		}()
 	}
@@ -130,53 +140,80 @@ func main() {
 			return // Exit early
 		}
 	}
+	config.RunfileIsDefault = !config.ShebangMode // May change once we know more about runfile
 	var stat os.FileInfo
+	var exists bool
 	var err error
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
 	//
 	if config.ShebangMode {
 		config.Me = path.Base(shebangFile) // Script Name = executable Name for Help
 		log.SetPrefix(config.Me + ": ")
-		inputFile = shebangFile // shebang file = runfile
+		config.Runfile = shebangFile // shebang file = runfile
 		config.EnableRunfileOverride = false
-		stat, err = os.Stat(inputFile)
+		stat, exists, err = util.StatIfExists(config.Runfile)
 	} else {
-		parseArgs()
+		exitCode = parseArgs()
+		if exitCode != 0 {
+			return
+		}
 		// No fallback logic when user specifies file, even if its "Runfile"
 		//
-		if len(inputFile) > 0 {
-			stat, err = os.Stat(inputFile)
+		if len(config.Runfile) > 0 {
+			stat, exists, err = util.StatIfExists(config.Runfile)
 		} else {
-			inputFile, stat, err = tryFindRunfile()
+			config.Runfile, stat, exists, err = tryFindRunfile()
 		}
 	}
+	var fileBytes []byte
+	var rfAst *ast.Ast
+	var rf *runfile.Runfile
 	// Verify file exists
 	//
-	if err == nil {
+	if exists {
 		if !stat.Mode().IsRegular() {
-			log.Printf("Error reading file '%s': File not considered 'regular'\n", inputFile)
-			showUsage() // exits
+			log.Printf("ERROR: runfile '%s': file not considered 'regular'", config.Runfile)
+			exitCode = 2
+			return
 		}
-		if config.RunFile, err = filepath.Abs(inputFile); err != nil {
-			log.Printf("Error reading file '%s': Cannot determine absolute path\n", inputFile)
-			showUsage() // exits
+		if config.RunfileAbs, err = filepath.Abs(config.Runfile); err != nil {
+			log.Printf("ERROR: runfile '%s': cannot determine absolute path", config.Runfile)
+			exitCode = 2
+			return
 		}
+		// Update IsDefault now that we know about the Runfile
+		//
+		config.RunfileIsDefault = !config.ShebangMode && config.Runfile == runfileDefault
+		// Read file into memory
+		//
+		if fileBytes, err = readFile(config.Runfile); err != nil {
+			// If path error, just show the wrapped error
+			//
+			if pathErr, ok := err.(*os.PathError); ok {
+				err = pathErr.Unwrap()
+			}
+			log.Printf("ERROR: runfile '%s': %s", config.Runfile, err.Error())
+			exitCode = 2
+			return
+		}
+		// Parse the file
+		//
+		rfAst = parser.Parse(lexer.Lex(fileBytes))
+		rf = ast.ProcessAST(rfAst)
+		config.RunfileIsLoaded = true
 	} else {
-		// TODO log err?
-		log.Printf("Input file not found: '%s' : Please create the file or specify an alternative", util.DefaultIfEmpty(inputFile, runfileDefault))
-		showUsage() // exits
+		if err == nil {
+			log.Printf("ERROR: runfile '%s' not found: please create the file or specify an alternative\n\n", util.DefaultIfEmpty(config.Runfile, runfileDefault)) // 2 x \n
+		} else {
+			// If path error, hide the operation (stat, open, etc)
+			//
+			if pathErr, ok := err.(*os.PathError); ok {
+				log.Printf("ERROR: %s: %s\n\n", pathErr.Path, pathErr.Err) // 2 x \n
+			} else {
+				log.Printf("ERROR: %s\n\n", err) // 2 x \n
+			}
+		}
 	}
-	// Read file into memory
-	//
-	fileBytes, err := readFile(config.RunFile)
-	if err != nil {
-		log.Printf("Error reading file '%s': %s\n", inputFile, err.Error())
-		showUsage() // exits
-	}
-	// Parse the file
-	//
-	rfAst := parser.Parse(lexer.Lex(fileBytes))
-	rf := ast.ProcessAST(rfAst)
 	// Setup Commands
 	//
 	listCmd := &config.Command{
@@ -186,16 +223,16 @@ func main() {
 		Run:    func() int { runfile.ListCommands(); return 0 },
 		Rename: func(_ string) {},
 	}
-	config.CommandMap["list"] = listCmd
+	config.CommandMap[listCmd.Name] = listCmd
 	config.CommandList = append(config.CommandList, listCmd)
 	helpCmd := &config.Command{
 		Name:   "help",
-		Title:  "(builtin) Show Help for a command",
-		Help:   showUsage, // exits
-		Run:    func() int { runfile.RunHelp(rf); return 0 },
+		Title:  "(builtin) Show help for a command",
+		Help:   showRunHelp,
+		Run:    runfile.RunHelp,
 		Rename: func(_ string) {},
 	}
-	config.CommandMap["help"] = helpCmd
+	config.CommandMap[helpCmd.Name] = helpCmd
 	config.CommandList = append(config.CommandList, helpCmd)
 	// In shebang mode, Version registered as 'run-version'
 	//
@@ -203,10 +240,9 @@ func main() {
 	if config.ShebangMode {
 		versionName = "run-version"
 	}
-
 	versionCmd := &config.Command{
 		Name:   versionName,
-		Title:  "(builtin) Show Run version",
+		Title:  "(builtin) Show run version",
 		Help:   func() { showVersion() },
 		Run:    func() int { showVersion(); return 0 },
 		Rename: func(_ string) {},
@@ -214,27 +250,35 @@ func main() {
 	config.CommandMap[versionName] = versionCmd
 	config.CommandList = append(config.CommandList, versionCmd)
 	builtinCnt := len(config.CommandList)
-	commandLines := make(map[string]int)
 
-	for _, rfcmd := range rf.Cmds {
-		name := strings.ToLower(rfcmd.Name) // normalize
-		if _, ok := config.CommandMap[name]; ok {
-			if prevline, ok := commandLines[name]; ok {
-				panic(fmt.Sprintf("Duplicate command: %s defined on line %d -- originally defined on line %d", name, rfcmd.Line, prevline))
-			} else {
-				panic(fmt.Sprintf("Duplicate command: %s defined on line %d -- this command is built-in", name, rfcmd.Line))
+	// Register runfile commands, if loaded
+	//
+	if rf != nil {
+		commandLines := make(map[string]int)
+		for _, rfCmd := range rf.Cmds {
+			name := strings.ToLower(rfCmd.Name) // normalize
+			// Look for dupes
+			//
+			if _, ok := config.CommandMap[name]; ok {
+				if commandLine, ok := commandLines[name]; ok {
+					panic(fmt.Sprintf("duplicate command: %s defined on line %d -- originally defined on line %d", name, rfCmd.Line, commandLine))
+				} else {
+					panic(fmt.Sprintf("duplicate command: %s defined on line %d -- this command is built-in", name, rfCmd.Line))
+				}
 			}
+			// Register cmd
+			//
+			commandLines[name] = rfCmd.Line
+			cmd := &config.Command{
+				Name:   rfCmd.Name,
+				Title:  rfCmd.Title(),
+				Help:   func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(rfCmd),
+				Run:    func(c *runfile.RunCmd) func() int { return func() int { return runfile.RunCommand(c) } }(rfCmd),
+				Rename: func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(rfCmd),
+			}
+			config.CommandMap[name] = cmd
+			config.CommandList = append(config.CommandList, cmd)
 		}
-		commandLines[name] = rfcmd.Line
-		cmd := &config.Command{
-			Name:   rfcmd.Name,
-			Title:  rfcmd.Title(),
-			Help:   func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(rfcmd),
-			Run:    func(c *runfile.RunCmd) func() int { return func() int { return runfile.RunCommand(c) } }(rfcmd),
-			Rename: func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(rfcmd),
-		}
-		config.CommandMap[name] = cmd
-		config.CommandList = append(config.CommandList, cmd)
 	}
 	// In shebang mode, if only 1 runfile command defined, named "main", default to it directly
 	//
@@ -254,48 +298,82 @@ func main() {
 		// If we deferred parsing args, now is the time
 		//
 		if config.ShebangMode {
-			parseArgs()
+			exitCode = parseArgs()
+			if exitCode != 0 {
+				return
+			}
 		}
 		if len(os.Args) > 0 {
 			cmdName, os.Args = os.Args[0], os.Args[1:]
 		} else {
-			// Default = first command in command list
 			//
-			cmdName = config.CommandList[0].Name
+			// Default (no command) action
+			//
+
+			if config.RunfileIsLoaded && !config.ShebangMode /*&& !config.RunfileIsDefault*/ {
+				fmt.Fprintf(config.ErrOut, "using runfile: %s\n\n", config.RunfileAbs) // 2 x \n
+			}
+			runfile.ListCommands()
+
+			pad := strings.Repeat(" ", len(config.Me)-1)
+			fmt.Fprintf(config.ErrOut, "\nUsage:\n") // Leading \n
+			fmt.Fprintf(config.ErrOut, "       %s <command> [option ...]\n", config.Me)
+			fmt.Fprintf(config.ErrOut, "       %s (run <command>)\n", pad)
+			fmt.Fprintf(config.ErrOut, "  or   %s help <command>\n", config.Me)
+			fmt.Fprintf(config.ErrOut, "       %s (show help for <command>)\n\n", pad) // 2 x \n
+			showUsageHint()
+			exitCode = 2
+			return
 		}
 	}
 	// Run command, if present, else error
 	//
 	cmdName = strings.ToLower(cmdName) // normalize
-	if cmd, ok := config.CommandMap[cmdName]; ok {
-		cmdExitCode = cmd.Run()
-	} else {
+	var cmd *config.Command
+	var ok bool
+	if cmd, ok = config.CommandMap[cmdName]; !ok {
 		log.Printf("command not found: %s", cmdName)
 		runfile.ListCommands()
-		os.Exit(2)
+		showUsageHint()
+		exitCode = 2
+		return
 	}
+	exitCode = cmd.Run()
 }
 
-func parseArgs() {
-	var showHelp bool
+func parseArgs() int {
+	flag.CommandLine.Init(config.Me, flag.ContinueOnError)
 	flag.CommandLine.SetOutput(config.ErrOut)
-	flag.CommandLine.Usage = showUsage // exits - Invoked if error parsing args
+
+	var showHelp bool
 	flag.BoolVar(&showHelp, "help", false, "")
 	flag.BoolVar(&showHelp, "h", false, "")
 	// No $RUNFILE/-r/--runfile support in shebang mode
 	//
 	if config.EnableRunfileOverride {
 		defaultInputFile := util.GetEnvOrDefault(runfileEnv, "")
-		flag.StringVar(&inputFile, "runfile", defaultInputFile, "")
-		flag.StringVar(&inputFile, "r", defaultInputFile, "")
+		flag.StringVar(&config.Runfile, "runfile", defaultInputFile, "")
+		flag.StringVar(&config.Runfile, "r", defaultInputFile, "")
+	}
+	exitCode := 0
+	// Invoked if error parsing args - sets exit code 2
+	//
+	flag.CommandLine.Usage = func() {
+		showUsageHint()
+		exitCode = 2
 	}
 	flag.Parse()
-	os.Args = flag.Args()
+	if exitCode != 0 {
+		return exitCode
+	}
 	// Help?
 	//
 	if showHelp {
-		showUsage() // exits
+		showRunHelp()
+		return 2
 	}
+	os.Args = flag.Args()
+	return 0
 }
 
 // Returns contents of file at specified path as a byte array
@@ -312,8 +390,7 @@ func readFile(path string) ([]byte, error) {
 	if file, err = os.Open(path); err == nil {
 		// Close file before we exit
 		//
-		//noinspection GoUnhandledErrorResult
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		// Read file into memory
 		//
 		if bytes, err = ioutil.ReadAll(file); err == nil {
@@ -335,11 +412,11 @@ func readFile(path string) ([]byte, error) {
 //   - Does not check root folder itself
 //   - Except for $HOME, which will be checked if present on $RUNFILE_ROOTS
 //
-func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
+func tryFindRunfile() (inputFile string, stat os.FileInfo, exists bool, err error) {
 	// Look for default Runfile
 	//
-	if stat, err = os.Stat(runfileDefault); err == nil {
-		return runfileDefault, stat, err
+	if stat, exists, err = util.StatIfExists(runfileDefault); exists {
+		return runfileDefault, stat, exists, err
 	}
 	// Look for root to possibly walk-up
 	//
@@ -348,17 +425,17 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
 		//
 		var wd string
 		if wd, err = os.Getwd(); err != nil {
-			return "", nil, err
+			return "", nil, false, err
 		}
 		wd = path.Clean(wd)
 		if !filepath.IsAbs(wd) {
-			return "", nil, fmt.Errorf("working directory is not absolute: %v", wd)
+			return "", nil, false, fmt.Errorf("working directory is not absolute: %v", wd)
 		}
 		// If we're already at the root, no need to look further
 		//
 		var wdDir string
 		if wdDir = filepath.Dir(wd); wdDir == wd {
-			return "", nil, errors.New("file not found")
+			return "", nil, false, errors.New("'Runfile' not found. please create file or specify an alternative")
 		}
 		// $HOME gets special treatment as an INCLUSIVE root
 		//
@@ -371,7 +448,7 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
 			if filepath.IsAbs(_root) { // TODO Log false?
 				// $HOME can match exactly
 				//
-				if _root == home && _root == wd {
+				if _root == home && home == wd {
 					root = _root
 					break
 				}
@@ -394,7 +471,7 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
 			var rel string
 			for rel, err = filepath.Rel(root, wd); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, "."); rel, err = filepath.Rel(root, wd) {
 				inputFile = filepath.Join(wd, runfileDefault)
-				if stat, err = os.Stat(inputFile); err == nil {
+				if stat, exists, err = util.StatIfExists(inputFile); exists {
 					return
 				}
 				wd = path.Dir(wd)
@@ -403,7 +480,7 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
 			//
 			if root == home && err == nil && rel == "." {
 				inputFile = filepath.Join(wd, runfileDefault)
-				if stat, err = os.Stat(inputFile); err == nil {
+				if stat, exists, err = util.StatIfExists(inputFile); exists {
 					return
 				}
 			}
@@ -411,5 +488,5 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, err error) {
 	}
 	// Nothing else to try, sorry dude
 	//
-	return "", nil, errors.New("file not found")
+	return "", nil, false, errors.New("'Runfile' not found. please create file or specify an alternative")
 }

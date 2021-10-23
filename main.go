@@ -102,6 +102,12 @@ func main() {
 
 	config.ErrOut = os.Stderr
 
+	if execPath, err := os.Executable(); err != nil { // Returns abs path on success
+		config.RunBin = execPath
+	} else {
+		config.RunBin = os.Args[0] // Punt to arg[0]
+	}
+	config.Me = path.Base(config.RunBin)
 	// Configure logging
 	//
 	log.SetFlags(0)
@@ -118,12 +124,6 @@ func main() {
 			}
 		}()
 	}
-	if execPath, err := os.Executable(); err != nil { // Returns abs path on success
-		config.RunBin = execPath
-	} else {
-		config.RunBin = os.Args[0] // Punt to arg[0]
-	}
-	config.Me = path.Base(config.RunBin)
 	// Shebang?
 	//
 	var shebangFile string

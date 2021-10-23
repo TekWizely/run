@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -459,13 +458,16 @@ func RunCommand(cmd *RunCmd) int {
 	}
 	for _, assert := range cmd.Scope.Asserts {
 		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
-			runFile := path.Base(config.Runfile)
 			// Print message if one configured
 			//
 			if len(assert.Message) > 0 {
-				log.Printf("%s: %s", runFile, assert.Message)
+				log.Printf("ERROR: %s", assert.Message)
 			} else {
-				log.Printf("%s:%d: assertion failed", runFile, assert.Line)
+				if config.ShebangMode {
+					log.Printf("ERROR: line %d: assertion failed", assert.Line)
+				} else {
+					log.Printf("ERROR: %s:%d: assertion failed", config.Runfile, assert.Line)
+				}
 			}
 			// ~= log.Fatal
 			return 1

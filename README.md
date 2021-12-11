@@ -62,7 +62,7 @@ In run, the entire script is executed within a single sub-shell.
  - [Using an Alternative Runfile](#using-an-alternative-runfile)
    - [Via Command-Line](#via-command-line)
    - [Via Environment Variables](#via-environment-variables)
-     - [`$RUNFILE`](#runfile)
+     - [`$RUNFILE`](#runfile-1)
        - [Using Direnv](#using-direnv-to-auto-configure-runfile)
      - [`$RUNFILE_ROOTS`](#runfile_roots)
  - [Runfile Variables](#runfile-variables)

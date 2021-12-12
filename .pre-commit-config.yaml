@@ -9,11 +9,12 @@ repos:
   # Built-in hooks
   # ==========================================================================
   -   repo: git://github.com/pre-commit/pre-commit-hooks
-      rev: v2.3.0
+      rev: v4.0.1
       hooks:
         -   id: check-merge-conflict
         -   id: check-yaml
         -   id: end-of-file-fixer
+            exclude: 'PKGBUILD'
         -   id: trailing-whitespace
 
     # ==========================================================================
@@ -54,7 +55,7 @@ repos:
     #       always_run: true        # Run even if no matching files staged
     # ==========================================================================
   -   repo: https://github.com/tekwizely/pre-commit-golang
-      rev: v0.8.0
+      rev: v1.0.0-beta.5
       hooks:
         -   id: go-build-mod
             alias: build
@@ -62,6 +63,9 @@ repos:
             alias: test
         -   id: go-vet-mod
             alias: vet
+        -   id: go-sec-mod
+            alias: sec
+            args: ['-exclude=G204']
         #     -   id: go-fmt
         #     -   id: go-imports # replaces go-fmt
         -   id: go-returns # replaces go-imports & go-fmt

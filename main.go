@@ -386,8 +386,9 @@ func readFile(path string) ([]byte, error) {
 	)
 
 	// Open the file
+	// filePath.Clean to appease the gosec gods [G304 (CWE-22)]
 	//
-	if file, err = os.Open(path); err == nil {
+	if file, err = os.Open(filepath.Clean(path)); err == nil {
 		// Close file before we exit
 		//
 		defer func() { _ = file.Close() }()

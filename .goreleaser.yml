@@ -4,7 +4,7 @@
 #
 # Usage:
 #
-#  GIT_SUMMARY=$(git describe --tags --dirty --always) goreleaser
+#  GIT_SUMMARY=$(git describe --tags --dirty --always) goreleaser --rm-dist --skip-publish
 #
 project_name: run
 env:
@@ -45,54 +45,3 @@ release:
   github:
     owner: TekWizely
     name: run
-brews:
-  - name: run
-    github:
-      owner: TekWizely
-      name: run
-
-    # Git author used to commit to the repository.
-    # Defaults are shown.
-    commit_author:
-      name: TekWizely
-      email: TekWize.ly@gmail.com
-
-    # Folder inside the repository to put the formula.
-    # Default is the root folder.
-    folder: Formula
-
-    # Your app's homepage.
-    # Default is empty.
-    homepage: "https://github.com/TekWizely/run"
-
-    # Your app's description.
-    # Default is empty.
-    description: "Easily manage and invoke small scripts and wrappers"
-
-    # Setting this will prevent goreleaser to actually try to commit the updated
-    # formula - instead, the formula file will be stored on the dist folder only,
-    # leaving the responsibility of publishing it to the user.
-    # If set to auto, the release will not be uploaded to the homebrew tap
-    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
-    # Default is false.
-    skip_upload: true
-
-    # Packages your package depends on.
-    dependencies:
-      - go
-
-    # So you can `brew test` your formula.
-    # Default is empty.
-    test: |
-      text = "Hello Homebrew!"
-      task = "hello"
-      (testpath/"Runfile").write <<~EOS
-      #{task}:
-      echo #{text}
-      EOS
-      assert_equal text, shell_output("#{bin}/#{name} #{task}").chomp
-
-    # Custom install-script for brew.
-    # Default is 'bin.install "program"'.
-    install: |
-      system "go", "build", "-trimpath", "-ldflags", "-w -s -X main.BuildTool=brew via tekwizely/tap/run", "-o", bin/name

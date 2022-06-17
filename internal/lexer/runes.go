@@ -49,6 +49,7 @@ var mainTokens = map[string]token.Type{
 	"CMD":     TokenCommand,
 	"EXPORT":  TokenExport,
 	"ASSERT":  TokenAssert,
+	"INCLUDE": TokenInclude,
 }
 
 // isMainToken isolates the lookup+check-ok logic.

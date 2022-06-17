@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -14,7 +13,6 @@ import (
 	"github.com/tekwizely/run/internal/ast"
 	"github.com/tekwizely/run/internal/config"
 	"github.com/tekwizely/run/internal/exec"
-	"github.com/tekwizely/run/internal/lexer"
 	"github.com/tekwizely/run/internal/parser"
 	"github.com/tekwizely/run/internal/runfile"
 	"github.com/tekwizely/run/internal/util"
@@ -100,6 +98,10 @@ func main() {
 		}
 	}()
 
+	// Hack to allow ast to invoke parse without circular dependency
+	//
+	ast.ParseBytes = parser.ParseBytes
+
 	config.ErrOut = os.Stderr
 
 	if execPath, err := os.Executable(); err != nil { // Returns abs path on success
@@ -141,7 +143,6 @@ func main() {
 		}
 	}
 	config.RunfileIsDefault = !config.ShebangMode // May change once we know more about runfile
-	var stat os.FileInfo
 	var exists bool
 	var err error
 	// In shebang mode, we defer parsing args until we know if we are in "main" mode
@@ -151,7 +152,7 @@ func main() {
 		log.SetPrefix(config.Me + ": ")
 		config.Runfile = shebangFile // shebang file = runfile
 		config.EnableRunfileOverride = false
-		stat, exists, err = util.StatIfExists(config.Runfile)
+		_, exists, err = util.StatIfExists(config.Runfile)
 	} else {
 		exitCode = parseArgs()
 		if exitCode != 0 {
@@ -160,45 +161,37 @@ func main() {
 		// No fallback logic when user specifies file, even if its "Runfile"
 		//
 		if len(config.Runfile) > 0 {
-			stat, exists, err = util.StatIfExists(config.Runfile)
+			_, exists, err = util.StatIfExists(config.Runfile)
 		} else {
-			config.Runfile, stat, exists, err = tryFindRunfile()
+			config.Runfile, _, exists, err = tryFindRunfile()
 		}
 	}
-	var fileBytes []byte
-	var rfAst *ast.Ast
 	var rf *runfile.Runfile
+	var bytes []byte
 	// Verify file exists
 	//
 	if exists {
-		if !stat.Mode().IsRegular() {
-			log.Printf("ERROR: runfile '%s': file not considered 'regular'", config.Runfile)
-			exitCode = 2
-			return
-		}
+		// Read from absolute path; Also used for RUNFILE variable
+		//
 		if config.RunfileAbs, err = filepath.Abs(config.Runfile); err != nil {
 			log.Printf("ERROR: runfile '%s': cannot determine absolute path", config.Runfile)
 			exitCode = 2
 			return
 		}
+		// Read the file (will re-check exists/stat, but that's the cost of the abstraction)
+		//
+		bytes, exists, err = util.ReadFileIfExists(config.RunfileAbs)
+	}
+	if exists {
+		// Mark primary Runfile as already included (to avoid include loops)
+		//
+		config.IncludedFiles[config.RunfileAbs] = struct{}{}
 		// Update IsDefault now that we know about the Runfile
 		//
 		config.RunfileIsDefault = !config.ShebangMode && config.Runfile == runfileDefault
-		// Read file into memory
+		rfAst := parser.ParseBytes(bytes)
+		// Process the AST
 		//
-		if fileBytes, err = readFile(config.Runfile); err != nil {
-			// If path error, just show the wrapped error
-			//
-			if pathErr, ok := err.(*os.PathError); ok {
-				err = pathErr.Unwrap()
-			}
-			log.Printf("ERROR: runfile '%s': %s", config.Runfile, err.Error())
-			exitCode = 2
-			return
-		}
-		// Parse the file
-		//
-		rfAst = parser.Parse(lexer.Lex(fileBytes))
 		rf = ast.ProcessAST(rfAst)
 		config.RunfileIsLoaded = true
 	} else {
@@ -374,33 +367,6 @@ func parseArgs() int {
 	}
 	os.Args = flag.Args()
 	return 0
-}
-
-// Returns contents of file at specified path as a byte array
-//
-func readFile(path string) ([]byte, error) {
-	var (
-		err   error
-		file  *os.File
-		bytes []byte
-	)
-
-	// Open the file
-	// filePath.Clean to appease the gosec gods [G304 (CWE-22)]
-	//
-	if file, err = os.Open(filepath.Clean(path)); err == nil {
-		// Close file before we exit
-		//
-		defer func() { _ = file.Close() }()
-		// Read file into memory
-		//
-		if bytes, err = ioutil.ReadAll(file); err == nil {
-			return bytes, nil
-		}
-	}
-	// If we get here, we have an error
-	//
-	return nil, err
 }
 
 // tryFindRunfile attempts to locate a Runfile

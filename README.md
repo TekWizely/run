@@ -76,6 +76,7 @@ In run, the entire script is executed within a single sub-shell.
    - [Shell Substitution](#shell-substitution)
    - [Conditional Assignment](#conditional-assignment)
  - [Assertions](#assertions)
+ - [Includes](#includes)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
@@ -831,6 +832,75 @@ Hello, Everybody
 ```
 
 *Note:* Assertions apply only to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
+
+------------
+### Includes
+
+Includes let you organize commands across multiple Runfiles.
+
+Includes have the following syntax:
+```
+INCLUDE <file pattern> | "<file pattern>" | '<file pattern>'
+```
+
+Simple example:
+
+_file layout_
+```
+Runfile
+Runfile-hello
+```
+
+_Runfile_
+```
+INCLUDE Runfile-hello
+```
+
+_Runfile-hello_
+```
+hello:
+    echo "Hello from Runfile-hello"
+```
+
+_output_
+```
+$ run hello
+
+Hello from Runfile-hello
+```
+
+#### File Globbing
+
+Run utilizes [goreleaser/fileglob](https://github.com/goreleaser/fileglob) in order support file globbing for includes.
+
+According to their README, `fileglob` supports:
+
+* Asterisk wildcards (`*`)
+* Super-asterisk wildcards (`**`)
+* Single symbol wildcards (`?`)
+* Character list matchers with negation and ranges (`[abc]`, `[!abc]`, `[a-c]`)
+* Alternative matchers (`{a,b}`)
+* Nested globbing (`{a,[bc]}`)
+* Escapable wildcards (`\{a\}/\*`)
+
+#### Working Directory
+
+Include names / glob-patterns are resolved relative to the Primary runfile's containing directory.
+
+File glob example:
+
+_file layout_
+```
+Runfile
+1/1/Runfile-1
+2/2/Runfile-2
+3/3/Runfile-3
+```
+
+_Runfile_
+```
+INCLUDE **/Runfile-*
+```
 
 --------------------------------------
 ### Invoking Other Commands & Runfiles

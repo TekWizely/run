@@ -70,6 +70,10 @@ var RunfileIsLoaded bool
 //
 var RunfileIsDefault bool
 
+// IncludedFiles contains a set of abs file paths to included Runfiles
+//
+var IncludedFiles = map[string]struct{}{}
+
 // EnableFnTrace shows parser/lexer fn call/stack
 //
 var EnableFnTrace = false

@@ -9,6 +9,7 @@ go 1.13
 // $ go get github.com/tekwizely/go-parsing/parser@master
 //
 require (
+	github.com/goreleaser/fileglob v1.3.0
 	github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15
 	github.com/tekwizely/go-parsing/lexer/token v0.0.0-20210910181107-ed69a13f4d15
 	github.com/tekwizely/go-parsing/parser v0.0.0-20210910181107-ed69a13f4d15

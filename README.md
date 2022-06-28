@@ -953,7 +953,9 @@ INCLUDE Runfile-hello  # Silently skipped
 Run exposes the following attributes:
 
 * `.RUN` - Absolute path of the run binary currently in use
-* `.RUNFILE` - Absolute path of the current Runfile
+* `.RUNFILE` - Absolute path of the current **primary** Runfile
+
+NOTE: Even from inside an [included](#includes) Runfile, `.RUNFILE` will always reference the primary Runfile
 
 Your command script can use these to invoke other commands:
 

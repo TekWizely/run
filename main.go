@@ -171,7 +171,7 @@ func main() {
 	// Verify file exists
 	//
 	if exists {
-		// Read from absolute path; Also used for RUNFILE variable
+		// Read from absolute path; Also used for .RUNFILE attribute
 		//
 		if config.RunfileAbs, err = filepath.Abs(config.Runfile); err != nil {
 			log.Printf("ERROR: runfile '%s': cannot determine absolute path", config.Runfile)

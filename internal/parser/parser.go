@@ -153,6 +153,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		ctx.l.PushFn(lexer.LexExpectNewline)
 		ctx.setLexFn(lexer.LexAssert)
 		assert := &ast.ScopeAssert{}
+		assert.Runfile = config.Runfile // Assumed to current file
 		assert.Line = t.Line()
 		assert.Test = expectTestString(ctx, p)
 		assert.Message = expectAssertMessage(ctx, p)
@@ -362,6 +363,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				ctx.l.PushFn(lexer.LexExpectNewline)
 				ctx.setLexFn(lexer.LexAssert)
 				assert := &ast.CmdAssert{}
+				assert.Runfile = config.Runfile // Assumed to current file
 				assert.Line = t.Line()
 				assert.Test = expectTestString(ctx, p)
 				assert.Message = expectAssertMessage(ctx, p)

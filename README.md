@@ -77,6 +77,10 @@ In run, the entire script is executed within a single sub-shell.
    - [Conditional Assignment](#conditional-assignment)
  - [Assertions](#assertions)
  - [Includes](#includes)
+   - [File Globbing](#file-globbing)
+   - [Working Directory](#working-directory)
+   - [File(s) Not Found](#files-not-found)
+   - [Avoiding Include Loops](#avoiding-include-loops)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
@@ -806,11 +810,11 @@ Hello, World
 
 $ run newman
 
-run: ERROR: Variable HELLO not defined
+run: ERROR: Runfile:7: Variable HELLO not defined
 
 $ run name
 
-run: ERROR: Variable HELLO not defined
+run: ERROR: Runfile:7: Variable HELLO not defined
 ```
 
 _example with HELLO_
@@ -821,7 +825,7 @@ Hello, Newman
 
 $ HELLO=Hello run name
 
-run: Variable NAME not defined
+run: ERROR: Runfile:16: Variable NAME not defined
 ```
 
 _example with HELLO and NAME_
@@ -883,11 +887,7 @@ According to their README, `fileglob` supports:
 * Nested globbing (`{a,[bc]}`)
 * Escapable wildcards (`\{a\}/\*`)
 
-#### Working Directory
-
-Include names / glob-patterns are resolved relative to the Primary runfile's containing directory.
-
-File glob example:
+**Fileglob Example:**
 
 _file layout_
 ```
@@ -900,6 +900,50 @@ Runfile
 _Runfile_
 ```
 INCLUDE **/Runfile-*
+```
+
+#### Working Directory
+
+Include names / glob-patterns are resolved relative to the Primary runfile's containing directory.
+
+#### File(s) Not Found
+
+##### OK For Glob
+
+When using a globbing pattern, Run considers it OK if the pattern results in no files being found.
+
+This makes it possible to support features like an optional Runfile include directory, or the ability to start a project folder with no includes but have them automatically picked up as you add them.
+
+_Runfile_
+
+```
+INCLUDE maybe_some_runfiles/Runfile-*  # OK if not no files found
+```
+
+##### BAD For Single File
+
+When using a single filename (no globbing), Run considers it an error if the include file is not found.
+
+_Runfile_
+```
+INCLUDE Runfile-must-exist  # Errors if file not found
+```
+
+_output_
+```
+$ run list
+
+run: include runfile not found: 'Runfile-must-exist'
+```
+
+#### Avoiding Include Loops
+
+Run keeps track of already-included runfiles and will silently avoid including the same runfile multiple times.
+
+_Runfile_
+```
+INCLUDE Runfile-hello
+INCLUDE Runfile-hello  # Silently skipped
 ```
 
 --------------------------------------

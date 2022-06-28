@@ -151,6 +151,7 @@ func (a *ScopeExportList) Apply(s *runfile.Scope) {
 // ScopeAssert asserts the test, exiting with message on failure.
 //
 type ScopeAssert struct {
+	Runfile string
 	Line    int
 	Test    ScopeValueNode
 	Message ScopeValueNode
@@ -160,6 +161,7 @@ type ScopeAssert struct {
 //
 func (a *ScopeAssert) Apply(s *runfile.Scope) {
 	assert := &runfile.Assert{}
+	assert.Runfile = a.Runfile
 	assert.Line = a.Line
 	assert.Test = a.Test.Apply(s)
 	assert.Message = strings.TrimSpace(a.Message.Apply(s))
@@ -186,10 +188,23 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 	if !filepath.IsAbs(filePattern) {
 		filePattern = filepath.Join(filepath.Dir(config.RunfileAbs), filePattern)
 	}
-	if files, err = fileglob.Glob(filePattern, fileglob.MaybeRootFS); err != nil {
-		panic(err)
-	} else if len(files) == 0 {
-		panic(fmt.Errorf("Include pattern '%s' resulted in no matches", filePattern))
+	// Skip fileglob if pattern does not look like a glob.
+	// By checking this ourselves, we hope to gain more control over error reporting,
+	// as fileglob currently (as of v1.3.0) conceals the fs.ErrorNotExist condition.
+	//
+	if fileglob.ContainsMatchers(filePattern) {
+		if files, err = fileglob.Glob(filePattern, fileglob.MaybeRootFS); err != nil {
+			panic(fmt.Errorf("processing include pattern '%s': %s", filePattern, err))
+			// OK for fileglob to result in 0 files, but we might want to notify user
+			// TODO Support verbose mode so we can display notices :)
+			//
+			// } else if len(files) == 0 {
+			// log.Printf("NOTICE: include pattern resulted in no matches: '%s'", filePattern)
+		}
+	} else {
+		// Specific (not-glob) filename expected to exist - Checked in loop below
+		//
+		files = []string{filePattern}
 	}
 	// NOTE: filenames assumed to be absolute
 	// TODO Sort list (path aware) ?
@@ -198,26 +213,37 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 		// Have we included this file already?
 		//
 		if _, included := config.IncludedFiles[filename]; included {
-			log.Printf("WARNING: runfile already included: '%s'", filename)
+			// Treat as a notice since we safely avoided the (possibly) infinite loop
+			//
+			// log.Printf("NOTICE: runfile already included: '%s'", filename)
 		} else {
 			fileBytes, exists, err := util.ReadFileIfExists(filename)
 			if exists {
 				// Mark file included
 				//
 				config.IncludedFiles[filename] = struct{}{}
-				// Save prefix, restore before leaving
+				// Save prefix and runfile, restore before leaving
 				//
 				logPrefix := log.Prefix()
-				defer func() { log.SetPrefix(logPrefix) }()
+				configRunfile := config.Runfile
+				configRunfileAbs := config.RunfileAbs
+				defer func() {
+					log.SetPrefix(logPrefix)
+					config.Runfile = configRunfile
+					config.RunfileAbs = configRunfileAbs
+				}()
 				// Set new prefix so parse errors/line numbers will be relative to the correct file
 				// For brevity, use path relative to dir(Runfile) if possible
 				//
 				var filenameRel string
 				if filenameRel, err = filepath.Rel(filepath.Dir(config.RunfileAbs), filename); err == nil && len(filenameRel) > 0 && !strings.HasPrefix(filenameRel, ".") {
 					log.SetPrefix(filenameRel + ": ")
+					config.Runfile = filenameRel
 				} else {
 					log.SetPrefix(filename + ": ")
+					config.Runfile = filename
 				}
+				config.RunfileAbs = filename
 				// Parse the file
 				//
 				rfAst := ParseBytes(fileBytes)
@@ -226,14 +252,14 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 				ProcessAstRunfile(rfAst, r)
 			} else {
 				if err == nil {
-					panic(fmt.Errorf("Include runfile '%s' not found", filename))
+					panic(fmt.Errorf("include runfile not found: '%s'", filename))
 				} else {
 					// If path error, just show the wrapped error
 					//
 					if pathErr, ok := err.(*os.PathError); ok {
 						err = pathErr.Unwrap()
 					}
-					panic(fmt.Errorf("Include runfile '%s': %s", filename, err.Error()))
+					panic(fmt.Errorf("include runfile '%s': %s", filename, err.Error()))
 				}
 			}
 		}
@@ -427,6 +453,7 @@ func (a *CmdOpt) Apply(c *runfile.RunCmd) *runfile.RunCmdOpt {
 // CmdAssert wraps a command assertion.
 //
 type CmdAssert struct {
+	Runfile string
 	Line    int
 	Test    ScopeValueNode
 	Message ScopeValueNode
@@ -436,6 +463,7 @@ type CmdAssert struct {
 //
 func (a *CmdAssert) Apply(s *runfile.Scope) *runfile.Assert {
 	assert := &runfile.Assert{}
+	assert.Runfile = a.Runfile
 	assert.Line = a.Line
 	assert.Test = a.Test.Apply(s)
 	assert.Message = strings.TrimSpace(a.Message.Apply(s))

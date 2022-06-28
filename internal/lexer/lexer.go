@@ -150,12 +150,7 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 // LexAssignmentValue delegates to other rValue lexers
 //
 func LexAssignmentValue(_ *LexContext, l *lexer.Lexer) LexFn {
-	// Consume leading space
-	//
-	if matchOneOrMore(l, isSpaceOrTab) {
-		l.Clear() // Discard
-	}
-
+	ignoreSpace(l)
 	switch l.Peek(1) {
 	case runeSQuote:
 		l.EmitType(TokenSQStringStart)

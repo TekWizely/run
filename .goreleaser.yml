@@ -45,12 +45,3 @@ release:
   github:
     owner: TekWizely
     name: run
-nfpms:
-  - maintainer: TekWizely <tekwizely@gmail.com>
-    description: Easily manage and invoke small scripts and wrappers.
-    homepage: https://github.com/TekWizely/run
-    license: MIT
-    formats:
-      - deb
-      - rpm
-      - apk

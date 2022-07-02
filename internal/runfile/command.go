@@ -461,13 +461,9 @@ func RunCommand(cmd *RunCmd) int {
 			// Print message if one configured
 			//
 			if len(assert.Message) > 0 {
-				log.Printf("ERROR: %s", assert.Message)
+				log.Printf("ERROR: %s:%d: %s", assert.Runfile, assert.Line, assert.Message)
 			} else {
-				if config.ShebangMode {
-					log.Printf("ERROR: line %d: assertion failed", assert.Line)
-				} else {
-					log.Printf("ERROR: %s:%d: assertion failed", config.Runfile, assert.Line)
-				}
+				log.Printf("ERROR: %s:%d: assertion failed", assert.Runfile, assert.Line)
 			}
 			// ~= log.Fatal
 			return 1

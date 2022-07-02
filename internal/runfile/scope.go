@@ -5,6 +5,7 @@ import "os"
 // Assert captures an assertion for a runfile.
 //
 type Assert struct {
+	Runfile string
 	Line    int
 	Test    string
 	Message string

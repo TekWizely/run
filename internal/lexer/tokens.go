@@ -50,6 +50,7 @@ const (
 
 	TokenExport
 	TokenAssert
+	TokenInclude
 	TokenCommand
 
 	TokenHashLine

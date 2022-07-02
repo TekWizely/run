@@ -2,8 +2,11 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
 // DefaultIfEmpty returns default string of src string is empty.
@@ -35,5 +38,44 @@ func StatIfExists(path string) (os.FileInfo, bool, error) {
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
 	}
+	return nil, false, err
+}
+
+// ReadFileIfExists returns contents of file at specified path as a byte array,
+// while letting you provide specific NotExist error handling
+// Returns []byte, true, nil if file exists, is normal, and can be read
+// Returns nil, false, nil if err == fs.ErrNotExist
+// Returns nil, false, err if err && err != fs.ErrNotExist
+//
+func ReadFileIfExists(path string) ([]byte, bool, error) {
+	var (
+		stat   os.FileInfo
+		exists bool
+		err    error
+		file   *os.File
+		bytes  []byte
+	)
+
+	if stat, exists, err = StatIfExists(path); !exists {
+		return nil, exists, err
+	}
+	if !stat.Mode().IsRegular() {
+		return nil, false, fmt.Errorf("file '%s': file not considered 'regular'", path)
+	}
+	// Open the file
+	// filePath.Clean to appease the gosec gods [G304 (CWE-22)]
+	//
+	if file, err = os.Open(filepath.Clean(path)); err == nil {
+		// Close file before we exit
+		//
+		defer func() { _ = file.Close() }()
+		// Read file into memory
+		//
+		if bytes, err = ioutil.ReadAll(file); err == nil {
+			return bytes, true, nil
+		}
+	}
+	// If we get here, we have an error
+	//
 	return nil, false, err
 }

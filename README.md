@@ -76,6 +76,11 @@ In run, the entire script is executed within a single sub-shell.
    - [Shell Substitution](#shell-substitution)
    - [Conditional Assignment](#conditional-assignment)
  - [Assertions](#assertions)
+ - [Includes](#includes)
+   - [File Globbing](#file-globbing)
+   - [Working Directory](#working-directory)
+   - [File(s) Not Found](#files-not-found)
+   - [Avoiding Include Loops](#avoiding-include-loops)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
@@ -805,11 +810,11 @@ Hello, World
 
 $ run newman
 
-run: ERROR: Variable HELLO not defined
+run: ERROR: Runfile:7: Variable HELLO not defined
 
 $ run name
 
-run: ERROR: Variable HELLO not defined
+run: ERROR: Runfile:7: Variable HELLO not defined
 ```
 
 _example with HELLO_
@@ -820,7 +825,7 @@ Hello, Newman
 
 $ HELLO=Hello run name
 
-run: Variable NAME not defined
+run: ERROR: Runfile:16: Variable NAME not defined
 ```
 
 _example with HELLO and NAME_
@@ -832,6 +837,115 @@ Hello, Everybody
 
 *Note:* Assertions apply only to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
 
+------------
+### Includes
+
+Includes let you organize commands across multiple Runfiles.
+
+Includes have the following syntax:
+```
+INCLUDE <file pattern> | "<file pattern>" | '<file pattern>'
+```
+
+Simple example:
+
+_file layout_
+```
+Runfile
+Runfile-hello
+```
+
+_Runfile_
+```
+INCLUDE Runfile-hello
+```
+
+_Runfile-hello_
+```
+hello:
+    echo "Hello from Runfile-hello"
+```
+
+_output_
+```
+$ run hello
+
+Hello from Runfile-hello
+```
+
+#### File Globbing
+
+Run utilizes [goreleaser/fileglob](https://github.com/goreleaser/fileglob) in order support file globbing for includes.
+
+According to their README, `fileglob` supports:
+
+* Asterisk wildcards (`*`)
+* Super-asterisk wildcards (`**`)
+* Single symbol wildcards (`?`)
+* Character list matchers with negation and ranges (`[abc]`, `[!abc]`, `[a-c]`)
+* Alternative matchers (`{a,b}`)
+* Nested globbing (`{a,[bc]}`)
+* Escapable wildcards (`\{a\}/\*`)
+
+**Fileglob Example:**
+
+_file layout_
+```
+Runfile
+1/1/Runfile-1
+2/2/Runfile-2
+3/3/Runfile-3
+```
+
+_Runfile_
+```
+INCLUDE **/Runfile-*
+```
+
+#### Working Directory
+
+Include names / glob-patterns are resolved relative to the Primary runfile's containing directory.
+
+#### File(s) Not Found
+
+##### OK For Glob
+
+When using a globbing pattern, Run considers it OK if the pattern results in no files being found.
+
+This makes it possible to support features like an optional Runfile include directory, or the ability to start a project folder with no includes but have them automatically picked up as you add them.
+
+_Runfile_
+
+```
+INCLUDE maybe_some_runfiles/Runfile-*  # OK if not no files found
+```
+
+##### BAD For Single File
+
+When using a single filename (no globbing), Run considers it an error if the include file is not found.
+
+_Runfile_
+```
+INCLUDE Runfile-must-exist  # Errors if file not found
+```
+
+_output_
+```
+$ run list
+
+run: include runfile not found: 'Runfile-must-exist'
+```
+
+#### Avoiding Include Loops
+
+Run keeps track of already-included runfiles and will silently avoid including the same runfile multiple times.
+
+_Runfile_
+```
+INCLUDE Runfile-hello
+INCLUDE Runfile-hello  # Silently skipped
+```
+
 --------------------------------------
 ### Invoking Other Commands & Runfiles
 
@@ -839,7 +953,9 @@ Hello, Everybody
 Run exposes the following attributes:
 
 * `.RUN` - Absolute path of the run binary currently in use
-* `.RUNFILE` - Absolute path of the current Runfile
+* `.RUNFILE` - Absolute path of the current **primary** Runfile
+
+NOTE: Even from inside an [included](#includes) Runfile, `.RUNFILE` will always reference the primary Runfile
 
 Your command script can use these to invoke other commands:
 

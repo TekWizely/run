@@ -16,6 +16,12 @@ import (
 	"github.com/tekwizely/run/internal/runfile"
 )
 
+// ParseBytes attempts to parse the specified byte array.
+//
+func ParseBytes(runfile []byte) *ast.Ast {
+	return Parse(lexer.Lex(runfile))
+}
+
 // parseFn
 //
 type parseFn func(*parseContext, *parser.Parser) parseFn
@@ -147,10 +153,22 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		ctx.l.PushFn(lexer.LexExpectNewline)
 		ctx.setLexFn(lexer.LexAssert)
 		assert := &ast.ScopeAssert{}
+		assert.Runfile = config.Runfile // Assumed to be current file
 		assert.Line = t.Line()
 		assert.Test = expectTestString(ctx, p)
 		assert.Message = expectAssertMessage(ctx, p)
 		ctx.ast.AddScopeNode(assert)
+		expectTokenType(p, lexer.TokenNewline, "expecting end of line")
+		p.Clear()
+		return parseMain
+	}
+	// Include
+	//
+	if tryPeekType(p, lexer.TokenInclude) {
+		p.Next()
+		ctx.pushLexFn(ctx.l.Fn)
+		valueList = expectAssignmentValue(ctx, p)
+		ctx.ast.Add(&ast.ScopeInclude{FilePattern: valueList})
 		expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 		p.Clear()
 		return parseMain
@@ -345,6 +363,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				ctx.l.PushFn(lexer.LexExpectNewline)
 				ctx.setLexFn(lexer.LexAssert)
 				assert := &ast.CmdAssert{}
+				assert.Runfile = config.Runfile // Assumed to be current file
 				assert.Line = t.Line()
 				assert.Test = expectTestString(ctx, p)
 				assert.Message = expectAssertMessage(ctx, p)

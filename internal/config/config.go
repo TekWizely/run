@@ -90,7 +90,7 @@ var ShowCmdShells = false
 // ShowNotices shows NOTICE level logging
 // TODO Support verbose mode, so we can display notices :)
 //
-var ShowNotices = true
+var ShowNotices = false
 
 // EnableRunfileOverride indicates if $RUNFILE env var or '-r | --runfile' arguments are supported in the current mode.
 //

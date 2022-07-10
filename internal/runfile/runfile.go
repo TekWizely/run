@@ -44,11 +44,12 @@ type RunCmdConfig struct {
 // RunCmd captures a command.
 //
 type RunCmd struct {
-	Name   string
-	Config *RunCmdConfig
-	Scope  *Scope
-	Script []string
-	Line   int
+	Name    string
+	Config  *RunCmdConfig
+	Scope   *Scope
+	Script  []string
+	Runfile string
+	Line    int
 }
 
 // Title fetches the first line of the description as the command title.

@@ -11,11 +11,12 @@ import (
 // Command is an abstraction for a command, allowing us to mix runfile commands and custom comments (help, list, etc).
 //
 type Command struct {
-	Name   string
-	Title  string
-	Help   func()
-	Run    func() int
-	Rename func(string) // Rename Command to script Name in 'main' mode
+	Name    string
+	Title   string
+	Help    func()
+	Run     func() int
+	Rename  func(string) // Rename Command to script Name in 'main' mode
+	Builtin bool
 }
 
 // DefaultShell specifies which shell to use for command scripts and sub-shells if none explicitly defined.
@@ -85,6 +86,11 @@ var ShowScriptTmpDir = false
 // ShowCmdShells shows the command shell in the command's help screen
 //
 var ShowCmdShells = false
+
+// ShowNotices shows NOTICE level logging
+// TODO Support verbose mode, so we can display notices :)
+//
+var ShowNotices = true
 
 // EnableRunfileOverride indicates if $RUNFILE env var or '-r | --runfile' arguments are supported in the current mode.
 //

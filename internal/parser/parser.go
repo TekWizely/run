@@ -228,15 +228,15 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 
 // tryMatchCmd
 //
-func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) bool {
+func tryMatchCmd(ctx *parseContext, p *parser.Parser, cmdConfig *ast.CmdConfig) bool {
 	var (
 		name  string
 		shell string
 		ok    bool
 		line  int
 	)
-	if config == nil {
-		config = &ast.CmdConfig{}
+	if cmdConfig == nil {
+		cmdConfig = &ast.CmdConfig{}
 	}
 
 	if name, shell, line, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
@@ -247,10 +247,10 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 		p.Next()
 	}
 	if len(shell) > 0 {
-		if len(config.Shell) > 0 && shell != config.Shell {
-			panic(parseError(p, fmt.Sprintf("Shell '%s' defined in cmd header, shell '%s' defined in attributes", shell, config.Shell)))
+		if len(cmdConfig.Shell) > 0 && shell != cmdConfig.Shell {
+			panic(parseError(p, fmt.Sprintf("Shell '%s' defined in cmd header, shell '%s' defined in attributes", shell, cmdConfig.Shell)))
 		}
-		config.Shell = shell
+		cmdConfig.Shell = shell
 	}
 	// Script
 	//
@@ -263,7 +263,13 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, config *ast.CmdConfig) boo
 	if len(script) == 0 {
 		panic(parseError(p, "command '"+name+"' contains an empty script."))
 	}
-	ctx.ast.Add(&ast.Cmd{Name: name, Config: config, Script: script, Line: line})
+	ctx.ast.Add(&ast.Cmd{
+		Name:    name,
+		Config:  cmdConfig,
+		Script:  script,
+		Runfile: config.Runfile, // Assumed to be current file
+		Line:    line,
+	})
 	return true
 }
 
@@ -786,7 +792,7 @@ func expectTokenType(p *parser.Parser, typ token.Type, msg string) token.Token {
 // tokenMsg
 //
 func tokenMsg(t token.Token, msg string) string {
-	return fmt.Sprintf("%d.%d: %s", t.Line(), t.Column(), msg)
+	return fmt.Sprintf("%s:%d.%d: %s", config.Runfile, t.Line(), t.Column(), msg)
 }
 
 // tokenError
@@ -807,5 +813,5 @@ func parseError(p *parser.Parser, msg string) error {
 		t := p.Peek(1)
 		return tokenError(t, msg)
 	}
-	return fmt.Errorf("<eof>: %s", msg)
+	return fmt.Errorf("%s: <eof>: %s", config.Runfile, msg)
 }

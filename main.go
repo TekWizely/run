@@ -210,20 +210,22 @@ func main() {
 	// Setup Commands
 	//
 	listCmd := &config.Command{
-		Name:   "list",
-		Title:  "(builtin) List available commands",
-		Help:   func() { runfile.ListCommands() },
-		Run:    func() int { runfile.ListCommands(); return 0 },
-		Rename: func(_ string) {},
+		Name:    "list",
+		Title:   "(builtin) List available commands",
+		Help:    func() { runfile.ListCommands() },
+		Run:     func() int { runfile.ListCommands(); return 0 },
+		Rename:  func(_ string) {},
+		Builtin: true,
 	}
 	config.CommandMap[listCmd.Name] = listCmd
 	config.CommandList = append(config.CommandList, listCmd)
 	helpCmd := &config.Command{
-		Name:   "help",
-		Title:  "(builtin) Show help for a command",
-		Help:   showRunHelp,
-		Run:    runfile.RunHelp,
-		Rename: func(_ string) {},
+		Name:    "help",
+		Title:   "(builtin) Show help for a command",
+		Help:    showRunHelp,
+		Run:     runfile.RunHelp,
+		Rename:  func(_ string) {},
+		Builtin: true,
 	}
 	config.CommandMap[helpCmd.Name] = helpCmd
 	config.CommandList = append(config.CommandList, helpCmd)
@@ -234,11 +236,12 @@ func main() {
 		versionName = "run-version"
 	}
 	versionCmd := &config.Command{
-		Name:   versionName,
-		Title:  "(builtin) Show run version",
-		Help:   func() { showVersion() },
-		Run:    func() int { showVersion(); return 0 },
-		Rename: func(_ string) {},
+		Name:    versionName,
+		Title:   "(builtin) Show run version",
+		Help:    func() { showVersion() },
+		Run:     func() int { showVersion(); return 0 },
+		Rename:  func(_ string) {},
+		Builtin: true,
 	}
 	config.CommandMap[versionName] = versionCmd
 	config.CommandList = append(config.CommandList, versionCmd)
@@ -247,30 +250,72 @@ func main() {
 	// Register runfile commands, if loaded
 	//
 	if rf != nil {
-		commandLines := make(map[string]int)
-		for _, rfCmd := range rf.Cmds {
-			name := strings.ToLower(rfCmd.Name) // normalize
+		runCommandsByFileAndName := make(map[string]map[string]*runfile.RunCmd)
+		runCommandsByName := make(map[string]*runfile.RunCmd)
+		for _, newRunCommand := range rf.Cmds {
+			newRunCommandName := newRunCommand.Name     // Un-normalized name used for help
+			name := strings.ToLower(newRunCommand.Name) // normalize
 			// Look for dupes
 			//
-			if _, ok := config.CommandMap[name]; ok {
-				if commandLine, ok := commandLines[name]; ok {
-					panic(fmt.Sprintf("duplicate command: %s defined on line %d -- originally defined on line %d", name, rfCmd.Line, commandLine))
-				} else {
-					panic(fmt.Sprintf("duplicate command: %s defined on line %d -- this command is built-in", name, rfCmd.Line))
+			configIndex := -1 // Keep original CommandList index when overriding commands; Makes help lists consistent
+			if existingConfigCommand, ok := config.CommandMap[name]; ok {
+				// Can't override builtin commands
+				//
+				if existingConfigCommand.Builtin {
+					panic(fmt.Sprintf("%s:%d cannot override built-in command %s", newRunCommand.Runfile, newRunCommand.Line, name))
 				}
+				// Can't override commands defined in same runfile
+				//
+				if runCommandsByNameForFile, ok := runCommandsByFileAndName[newRunCommand.Runfile]; ok {
+					if oldRunCommandForFile, ok := runCommandsByNameForFile[name]; ok {
+						panic(fmt.Sprintf("%s: command %s defined multiple times in the same file: lines %d and %d", newRunCommand.Runfile, name, oldRunCommandForFile.Line, newRunCommand.Line))
+					}
+				}
+				// OK to override command, but notify user
+				//
+				if config.ShowNotices {
+					if oldRunCommand, ok := runCommandsByName[name]; ok { // Should ALWAYS succeed
+						log.Printf("NOTICE: %s:%d command %s overrides command %s defined in %s:%d", newRunCommand.Runfile, newRunCommand.Line, newRunCommand.Name, oldRunCommand.Name, oldRunCommand.Runfile, oldRunCommand.Line)
+					}
+				}
+				// Remove old command, taking note of command name and CommandList index, which will be re-used
+				//
+				delete(config.CommandMap, name) // Technically not needed but feels cleaner
+				for i := range config.CommandList {
+					if config.CommandList[i] == existingConfigCommand {
+						configIndex = i
+						break
+					}
+				}
+				// For help display, first registered command wins - So propagate existing name
+				//
+				newRunCommandName = existingConfigCommand.Name
 			}
 			// Register cmd
 			//
-			commandLines[name] = rfCmd.Line
+			fileCommandsByName, ok := runCommandsByFileAndName[newRunCommand.Runfile]
+			if !ok {
+				fileCommandsByName = make(map[string]*runfile.RunCmd)
+				runCommandsByFileAndName[newRunCommand.Runfile] = fileCommandsByName
+			}
+			fileCommandsByName[name] = newRunCommand
+			runCommandsByName[name] = newRunCommand
 			cmd := &config.Command{
-				Name:   rfCmd.Name,
-				Title:  rfCmd.Title(),
-				Help:   func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(rfCmd),
-				Run:    func(c *runfile.RunCmd) func() int { return func() int { return runfile.RunCommand(c) } }(rfCmd),
-				Rename: func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(rfCmd),
+				Name:    newRunCommandName,
+				Title:   newRunCommand.Title(),
+				Help:    func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(newRunCommand),
+				Run:     func(c *runfile.RunCmd) func() int { return func() int { return runfile.RunCommand(c) } }(newRunCommand),
+				Rename:  func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(newRunCommand),
+				Builtin: false,
 			}
 			config.CommandMap[name] = cmd
-			config.CommandList = append(config.CommandList, cmd)
+			// Append or replace?
+			//
+			if configIndex >= 0 {
+				config.CommandList[configIndex] = cmd
+			} else {
+				config.CommandList = append(config.CommandList, cmd)
+			}
 		}
 	}
 	// In shebang mode, if only 1 runfile command defined, named "main", default to it directly

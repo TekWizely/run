@@ -166,8 +166,8 @@ _Runfile_
 hello-world:
   echo "Hello, world"
 
-Hello-World:
-  echo "Hello, world"
+HELLO-WORLD:
+  echo "HELLO, WORLD"
 ```
 
 _list commands_

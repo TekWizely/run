@@ -85,6 +85,7 @@ In run, the entire script is executed within a single sub-shell.
      - [Cannot Re-Register Command In Same Runfile](#cannot-re-register-command-in-same-runfile)
      - [Overrides Are Case-Insensitive](#overrides-are-case-insensitive)
      - [First Registered Command Defines Case For Help](#first-registered-command-defines-case-for-help)
+     - [First Registered Command Defines Default Documentation](#first-registered-command-defines-default-documentation)
      - [Commands Are Listed In The Order They Are Registered](#commands-are-listed-in-the-order-they-are-registered)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
@@ -1009,7 +1010,6 @@ hello-world:
 ```
 
 _list commands_
-
 ```
 $ run list
 
@@ -1032,7 +1032,7 @@ include Runfile-include
 _Runfile-include_
 ```
 ## defined in Runfile-include
-Command1:
+COMMAND1:
   echo command1 from Runfile-include
 ```
 
@@ -1045,11 +1045,11 @@ Commands:
   command1    defined in Runfile-include
 ```
 
-Notice that `Command1` from the _included_ runfile overrides `command1` from the _primary_ runfile.
+Notice that `COMMAND1` from the _included_ runfile overrides `command1` from the _primary_ runfile.
 
 ###### First Registered Command Defines Case For Help
 
-Run keeps track of the original case used when a command is first registered, and uses _that_ name when displaying help:
+Run keeps track of the original case used when a command is first registered, and uses it when displaying help:
 
 _Runfile_
 ```
@@ -1074,10 +1074,46 @@ $ run list
 Commands:
   ...
   COMMAND1    defined in Runfile-include
-
 ```
 
-Notice that, even though `command1` from the _included_ runfile will be invoked, the displayed name comes from the original registration in the _primary_ runfile.
+Notice that the displayed name comes from the original registration in the _primary_ runfile.
+
+##### First Registered Command Defines Default Documentation
+
+Run keeps track of the title & description when a command is first registered, and uses it if an overriding command does not define its own documentation:
+
+_Runfile_
+```
+## title defined in Runfile
+command1:
+  echo command1 from Runfile
+
+include Runfile-include
+```
+
+_Runfile-include_
+```
+command1:
+  echo command1 from Runfile-include
+```
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  commmand1    title defined in Runfile
+```
+
+_command output_
+```
+$ run command1
+
+command1 from Runfile-include
+```
+
+Notice that, even though `command1` from the _included_ runfile was invoked, the displayed title comes from the original registration in the _primary_ runfile.
 
 ##### Commands Are Listed In The Order They Are Registered
 
@@ -1107,7 +1143,7 @@ command2:
   echo command2 from Runfile-include
 ```
 
-_usage_
+_list commands_
 ```
 $ run list
 

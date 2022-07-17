@@ -250,15 +250,24 @@ func main() {
 	// Register runfile commands, if loaded
 	//
 	if rf != nil {
+		firstRunCommandsByName := make(map[string]*runfile.RunCmd) // Keep track of first occurrences for name and default title/description
 		runCommandsByFileAndName := make(map[string]map[string]*runfile.RunCmd)
 		runCommandsByName := make(map[string]*runfile.RunCmd)
 		for _, newRunCommand := range rf.Cmds {
 			newRunCommandName := newRunCommand.Name     // Un-normalized name used for help
 			name := strings.ToLower(newRunCommand.Name) // normalize
+			// Keep track of which Runfile a command is registered in, to avoid dupes from same file
+			//
+			runCommandsByNameForFile, ok := runCommandsByFileAndName[newRunCommand.Runfile]
+			if !ok {
+				runCommandsByNameForFile = make(map[string]*runfile.RunCmd)
+				runCommandsByFileAndName[newRunCommand.Runfile] = runCommandsByNameForFile
+			}
 			// Look for dupes
 			//
 			configIndex := -1 // Keep original CommandList index when overriding commands; Makes help lists consistent
-			if existingConfigCommand, ok := config.CommandMap[name]; ok {
+			if firstRunCommand, ok := firstRunCommandsByName[name]; ok {
+				existingConfigCommand := config.CommandMap[name] // Should ALWAYS succeed
 				// Can't override builtin commands
 				//
 				if existingConfigCommand.Builtin {
@@ -266,10 +275,8 @@ func main() {
 				}
 				// Can't override commands defined in same runfile
 				//
-				if runCommandsByNameForFile, ok := runCommandsByFileAndName[newRunCommand.Runfile]; ok {
-					if oldRunCommandForFile, ok := runCommandsByNameForFile[name]; ok {
-						panic(fmt.Sprintf("%s: command %s defined multiple times in the same file: lines %d and %d", newRunCommand.Runfile, name, oldRunCommandForFile.Line, newRunCommand.Line))
-					}
+				if oldRunCommandForFile, ok := runCommandsByNameForFile[name]; ok {
+					panic(fmt.Sprintf("%s: command %s defined multiple times in the same file: lines %d and %d", newRunCommand.Runfile, name, oldRunCommandForFile.Line, newRunCommand.Line))
 				}
 				// OK to override command, but notify user
 				//
@@ -287,18 +294,18 @@ func main() {
 						break
 					}
 				}
-				// For help display, first registered command wins - So propagate existing name
+				// For help display, first registered command wins
 				//
-				newRunCommandName = existingConfigCommand.Name
+				newRunCommandName = firstRunCommand.Name
+				// If no Title/Description defined, use first command's as its considered canonical
+				//
+				if len(newRunCommand.Config.Desc) == 0 {
+					newRunCommand.Config.Desc = firstRunCommand.Config.Desc // TODO Make defensive copy?
+				}
 			}
 			// Register cmd
 			//
-			fileCommandsByName, ok := runCommandsByFileAndName[newRunCommand.Runfile]
-			if !ok {
-				fileCommandsByName = make(map[string]*runfile.RunCmd)
-				runCommandsByFileAndName[newRunCommand.Runfile] = fileCommandsByName
-			}
-			fileCommandsByName[name] = newRunCommand
+			runCommandsByNameForFile[name] = newRunCommand
 			runCommandsByName[name] = newRunCommand
 			cmd := &config.Command{
 				Name:    newRunCommandName,
@@ -315,6 +322,7 @@ func main() {
 				config.CommandList[configIndex] = cmd
 			} else {
 				config.CommandList = append(config.CommandList, cmd)
+				firstRunCommandsByName[name] = newRunCommand
 			}
 		}
 	}

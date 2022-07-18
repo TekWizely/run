@@ -1522,6 +1522,29 @@ $ brew tap tekwizely/tap
 $ brew install run
 ```
 
+#### NIX
+
+For Nix users, a package is available on nixpkgs:
+
+* [Nix package for Run](https://search.nixos.org/packages?show=run&from=0&size=1&sort=relevance&type=packages&query=run)
+
+Supported Platforms:
+* x86_64-darwin
+* aarch64-darwin
+* aarch64-linux
+* i686-linux
+* x86_64-linux
+
+_install run on NixOS_
+```bash
+$ nix-env -iA nixos.run
+```
+
+_install run on non-NixOs_
+```bash
+$ nix-env -iA nixpkgs.run
+```
+
 #### AUR
 
 For Archlinux users, a package is available on the AUR:

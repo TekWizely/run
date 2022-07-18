@@ -81,6 +81,12 @@ In run, the entire script is executed within a single sub-shell.
    - [Working Directory](#working-directory)
    - [File(s) Not Found](#files-not-found)
    - [Avoiding Include Loops](#avoiding-include-loops)
+   - [Overriding Commands](#overriding-commands)
+     - [Cannot Re-Register Command In Same Runfile](#cannot-re-register-command-in-same-runfile)
+     - [Overrides Are Case-Insensitive](#overrides-are-case-insensitive)
+     - [First Registered Command Defines Case For Help](#first-registered-command-defines-case-for-help)
+     - [First Registered Command Defines Default Documentation](#first-registered-command-defines-default-documentation)
+     - [Commands Are Listed In The Order They Are Registered](#commands-are-listed-in-the-order-they-are-registered)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
@@ -148,6 +154,31 @@ Some examples:
 
 ##### Case Sensitivity
 
+###### Registering Commands
+
+When registering commands, run treats the command name as case-insensitive and subject to [command override](#overriding-commands) rules.
+
+*case-insensitive override example*
+
+For example, run will generate an error if a command name is defined multiple times in the same runfile, even if the names use different cases:
+
+_Runfile_
+```
+hello-world:
+  echo "Hello, world"
+
+HELLO-WORLD:
+  echo "HELLO, WORLD"
+```
+
+_list commands_
+
+```
+$ run list
+
+run: Runfile: command hello-world defined multiple times in the same file: lines 1 and 4
+```
+
 ###### Invoking Commands
 
 When invoking commands, run treats the command name as case-insensitive:
@@ -169,7 +200,7 @@ Hello, world
 
 ###### Displaying Help
 
-When displaying help text, run treats the command name as case-sensitive, displaying the command name as it is defined:
+When displaying help text, run displays command names as they are originally defined:
 
 _list commands_
 
@@ -177,37 +208,16 @@ _list commands_
 $ run list
 
 Commands:
-  ..
+  ...
   Hello-World
   ...
 ```
 
 _show help for Hello-World command_
 ```
-$ run help Hello-World
+$ run help hello-world
 
 Hello-World: no help available.
-```
-
-###### Duplicate Command Names
-
-When registering commands, run treats the command name as case-insensitive, generating an error if a command name is defined multiple times:
-
-_Runfile_
-```
-hello-world:
-  echo "Hello, world"
-
-Hello-World:
-  echo "Hello, world"
-```
-
-_list commands_
-
-```
-$ run list
-
-run: duplicate command: hello-world defined on line 4 -- originally defined on line 1
 ```
 
 ----------------------------
@@ -945,6 +955,206 @@ _Runfile_
 INCLUDE Runfile-hello
 INCLUDE Runfile-hello  # Silently skipped
 ```
+
+#### Overriding Commands
+
+Run allows you override commands, as long as they were originally registered in a _different_ Runfile.
+
+_Runfile_
+```
+## defined in Runfile
+command1:
+  echo command1 from Runfile
+
+INCLUDE Runfile-include
+
+## defined in Runfile
+command2:
+  echo command2 from Runfile
+```
+
+_Runfile-include_
+```
+## defined in Runfile-include
+command1:
+  echo command1 from Runfile-include
+
+## defined in Runfile-include
+command2:
+  echo command2 from Runfile-include
+```
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  command1    defined in Runfile-include
+  command2    defined in Runfile
+```
+
+Notice that the _included_ runfile overrides `command1`, but the _primary_ runfile overrides `command2`.
+
+##### Cannot Re-Register Command In Same Runfile
+
+Run will error when attempting to register a command multiple times within the _same_ Runfile:
+
+_Runfile_
+```
+hello-world:
+  echo "Hello, world"
+
+hello-world:
+  echo "Hello, world"
+```
+
+_list commands_
+```
+$ run list
+
+run: Runfile: command hello-world defined multiple times in the same file: lines 1 and 4
+```
+
+##### Overrides Are Case-Insensitive
+
+Run's override matching is case-insensitive:
+
+_Runfile_
+```
+## defined in Runfile
+command1:
+  echo command1 from Runfile
+
+include Runfile-include
+```
+
+_Runfile-include_
+```
+## defined in Runfile-include
+COMMAND1:
+  echo command1 from Runfile-include
+```
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  command1    defined in Runfile-include
+```
+
+Notice that `COMMAND1` from the _included_ runfile overrides `command1` from the _primary_ runfile.
+
+###### First Registered Command Defines Case For Help
+
+Run keeps track of the original case used when a command is first registered, and uses it when displaying help:
+
+_Runfile_
+```
+## defined in Runfile
+COMMAND1:
+  echo command1 from Runfile
+
+include Runfile-include
+```
+
+_Runfile-include_
+```
+## defined in Runfile-include
+command1:
+  echo command1 from Runfile-include
+```
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  COMMAND1    defined in Runfile-include
+```
+
+Notice that the displayed name comes from the original registration in the _primary_ runfile.
+
+##### First Registered Command Defines Default Documentation
+
+Run keeps track of the title & description when a command is first registered, and uses it if an overriding command does not define its own documentation:
+
+_Runfile_
+```
+## title defined in Runfile
+command1:
+  echo command1 from Runfile
+
+include Runfile-include
+```
+
+_Runfile-include_
+```
+command1:
+  echo command1 from Runfile-include
+```
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  commmand1    title defined in Runfile
+```
+
+_command output_
+```
+$ run command1
+
+command1 from Runfile-include
+```
+
+Notice that, even though `command1` from the _included_ runfile was invoked, the displayed title comes from the original registration in the _primary_ runfile.
+
+##### Commands Are Listed In The Order They Are Registered
+
+Run keeps track of the _order_ in which commands are registered, and maintains that order even if a command is later overridden:
+
+_Runfile_
+```
+## defined in Runfile
+command1:
+  echo command1 from Runfile
+
+## defined in Runfile
+command2:
+  echo command2 from Runfile
+
+## defined in Runfile
+command3:
+  echo command3 from Runfile
+
+include Runfile-include
+```
+
+_Runfile-include_
+```
+## defined in Runfile-include
+command2:
+  echo command2 from Runfile-include
+```
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  command1    defined in Runfile
+  command2    defined in Runfile-include
+  command3    defined in Runfile
+```
+
+Notice that `command2` is still shown _between_ `command1` and `command3`, matching the order in which it was originally registered.
 
 --------------------------------------
 ### Invoking Other Commands & Runfiles

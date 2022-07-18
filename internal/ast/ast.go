@@ -195,11 +195,10 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 	if fileglob.ContainsMatchers(filePattern) {
 		if files, err = fileglob.Glob(filePattern, fileglob.MaybeRootFS); err != nil {
 			panic(fmt.Errorf("processing include pattern '%s': %s", filePattern, err))
-			// OK for fileglob to result in 0 files, but we might want to notify user
-			// TODO Support verbose mode so we can display notices :)
+			// OK for fileglob to result in 0 files, but notify user
 			//
-			// } else if len(files) == 0 {
-			// log.Printf("NOTICE: include pattern resulted in no matches: '%s'", filePattern)
+		} else if config.ShowNotices && len(files) == 0 {
+			log.Printf("NOTICE: include pattern resulted in no matches: %s", filePattern)
 		}
 	} else {
 		// Specific (not-glob) filename expected to exist - Checked in loop below
@@ -215,7 +214,9 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 		if _, included := config.IncludedFiles[filename]; included {
 			// Treat as a notice since we safely avoided the (possibly) infinite loop
 			//
-			// log.Printf("NOTICE: runfile already included: '%s'", filename)
+			if config.ShowNotices {
+				log.Printf("NOTICE: runfile already included: '%s'", filename)
+			}
 		} else {
 			fileBytes, exists, err := util.ReadFileIfExists(filename)
 			if exists {
@@ -341,20 +342,22 @@ func (a *ScopeDParenString) Apply(s *runfile.Scope) string {
 // Cmd wraps a parsed command.
 //
 type Cmd struct {
-	Name   string
-	Config *CmdConfig
-	Script []string
-	Line   int
+	Name    string
+	Config  *CmdConfig
+	Script  []string
+	Runfile string
+	Line    int
 }
 
 // Apply applies the node to the runfile.
 //
 func (a *Cmd) Apply(r *runfile.Runfile) {
 	cmd := &runfile.RunCmd{
-		Name:   a.Name,
-		Scope:  runfile.NewScope(),
-		Script: a.Script,
-		Line:   a.Line,
+		Name:    a.Name,
+		Scope:   runfile.NewScope(),
+		Script:  a.Script,
+		Runfile: a.Runfile,
+		Line:    a.Line,
 	}
 	// Exports
 	//

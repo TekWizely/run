@@ -23,11 +23,14 @@ var ParseBytes func(runfile []byte) *Ast = nil
 //
 func ProcessAST(ast *Ast) *runfile.Runfile {
 	rf := runfile.NewRunfile()
-	// Seed defaults
+	// Seed attributes
 	//
 	rf.Scope.PutAttr(".SHELL", config.DefaultShell)
 	rf.Scope.PutAttr(".RUN", config.RunBin)
 	rf.Scope.PutAttr(".RUNFILE", config.RunfileAbs)
+	rf.Scope.PutAttr(".RUNFILE.DIR", config.RunfileAbsDir)
+	rf.Scope.PutAttr(".SELF.RUNFILE", config.CurrentRunfileAbs)
+	rf.Scope.PutAttr(".SELF.DIR", config.CurrentRunfileAbsDir)
 	for _, n := range ast.nodes {
 		n.Apply(rf)
 	}
@@ -38,6 +41,17 @@ func ProcessAST(ast *Ast) *runfile.Runfile {
 // Assumes Runfile created via ProcessAST
 //
 func ProcessAstRunfile(ast *Ast, rf *runfile.Runfile) {
+	// Seed attributes
+	// Save current values, restore before leaving
+	//
+	selfRunfileBak, _ := rf.Scope.GetAttr(".SELF.RUNFILE")
+	selfRunfileDirBak, _ := rf.Scope.GetAttr(".SELF.DIR")
+	defer func() {
+		rf.Scope.PutAttr(".SELF.RUNFILE", selfRunfileBak)
+		rf.Scope.PutAttr(".SELF.DIR", selfRunfileDirBak)
+	}()
+	rf.Scope.PutAttr(".SELF.RUNFILE", config.CurrentRunfileAbs)
+	rf.Scope.PutAttr(".SELF.DIR", config.CurrentRunfileAbsDir)
 	for _, n := range ast.nodes {
 		n.Apply(rf)
 	}
@@ -183,10 +197,10 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 		err   error
 	)
 	// We want the absolute file paths for include tracking
-	// If pattern is not absolute, assume its relative to dir(Runfile)
+	// If pattern is not absolute, assume its relative to config.RunfileAbsDir
 	//
 	if !filepath.IsAbs(filePattern) {
-		filePattern = filepath.Join(filepath.Dir(config.RunfileAbs), filePattern)
+		filePattern = filepath.Join(config.RunfileAbsDir, filePattern)
 	}
 	// Skip fileglob if pattern does not look like a glob.
 	// By checking this ourselves, we hope to gain more control over error reporting,
@@ -205,6 +219,18 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 		//
 		files = []string{filePattern}
 	}
+	// Save log prefix and current runfile values, restore before leaving
+	//
+	logPrefixBak := log.Prefix()
+	currentRunfileBak := config.CurrentRunfile
+	currentRunfileAbsBak := config.CurrentRunfileAbs
+	currentRunfileAbsDirBak := config.CurrentRunfileAbsDir
+	defer func() {
+		log.SetPrefix(logPrefixBak)
+		config.CurrentRunfile = currentRunfileBak
+		config.CurrentRunfileAbs = currentRunfileAbsBak
+		config.CurrentRunfileAbsDir = currentRunfileAbsDirBak
+	}()
 	// NOTE: filenames assumed to be absolute
 	// TODO Sort list (path aware) ?
 	//
@@ -223,35 +249,36 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 				// Mark file included
 				//
 				config.IncludedFiles[filename] = struct{}{}
-				// Save prefix and runfile, restore before leaving
-				//
-				logPrefix := log.Prefix()
-				configRunfile := config.Runfile
-				configRunfileAbs := config.RunfileAbs
-				defer func() {
-					log.SetPrefix(logPrefix)
-					config.Runfile = configRunfile
-					config.RunfileAbs = configRunfileAbs
-				}()
 				// Set new prefix so parse errors/line numbers will be relative to the correct file
-				// For brevity, use path relative to dir(Runfile) if possible
+				// For brevity, use path relative to config.RunfileAbsDir if possible
 				//
 				var filenameRel string
-				if filenameRel, err = filepath.Rel(filepath.Dir(config.RunfileAbs), filename); err == nil && len(filenameRel) > 0 && !strings.HasPrefix(filenameRel, ".") {
+				if filenameRel, err = filepath.Rel(config.RunfileAbsDir, filename); err == nil && len(filenameRel) > 0 && !strings.HasPrefix(filenameRel, ".") {
 					log.SetPrefix(filenameRel + ": ")
-					config.Runfile = filenameRel
+					config.CurrentRunfile = filenameRel
 				} else {
 					log.SetPrefix(filename + ": ")
-					config.Runfile = filename
+					config.CurrentRunfile = filename
 				}
-				config.RunfileAbs = filename
+				config.CurrentRunfileAbs = filename
+				config.CurrentRunfileAbsDir = filepath.Dir(config.CurrentRunfileAbs)
 				// Parse the file
 				//
 				rfAst := ParseBytes(fileBytes)
 				// Process the AST
 				//
 				ProcessAstRunfile(rfAst, r)
+				// Restore values here too for consistency
+				//
+				log.SetPrefix(logPrefixBak)
+				config.CurrentRunfile = currentRunfileBak
+				config.CurrentRunfileAbs = currentRunfileAbsBak
+				config.CurrentRunfileAbsDir = currentRunfileAbsDirBak
 			} else {
+				//
+				// We're about to panic, assume prior defer will restore values before exiting
+				//
+
 				if err == nil {
 					panic(fmt.Errorf("include runfile not found: '%s'", filename))
 				} else {

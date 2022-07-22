@@ -55,13 +55,17 @@ var CommandMap = make(map[string]*Command)
 //
 var RunBin string
 
-// Runfile holds the (possibly relative) path to the current Runfile.
+// Runfile holds the (possibly relative) path to the primary Runfile.
 //
 var Runfile string
 
-// RunfileAbs holds the absolute path to the current Runfile.
+// RunfileAbs holds the absolute path to the primary Runfile.
 //
 var RunfileAbs string
+
+// RunfileAbsDir holds the absolute path to the containing folder of the primary Runfile.
+//
+var RunfileAbsDir string
 
 // RunfileIsLoaded is true if the runfile has been successfully loaded
 //
@@ -70,6 +74,18 @@ var RunfileIsLoaded bool
 // RunfileIsDefault is true if the current Runfile is the default "Runfile"
 //
 var RunfileIsDefault bool
+
+// CurrentRunfile holds the (possibly relative) path to the current (primary or otherwise) Runfile.
+//
+var CurrentRunfile string
+
+// CurrentRunfileAbs holds the absolute path to the current (primary or otherwise) Runfile.
+//
+var CurrentRunfileAbs string
+
+// CurrentRunfileAbsDir holds the absolute path to the containing folder of the current (primary or otherwise) Runfile.
+//
+var CurrentRunfileAbsDir string
 
 // IncludedFiles contains a set of abs file paths to included Runfiles
 //

@@ -178,6 +178,13 @@ func main() {
 			exitCode = 2
 			return
 		}
+		// Runfile parent directory used for .RUNFILE.DIR attribute
+		//
+		config.RunfileAbsDir = filepath.Dir(config.RunfileAbs)
+		// Current runfile/dir values, also used for .SELF / .SELF.DIR attributes
+		//
+		config.CurrentRunfileAbs = config.RunfileAbs
+		config.CurrentRunfileAbsDir = config.RunfileAbsDir
 		// Read the file (will re-check exists/stat, but that's the cost of the abstraction)
 		//
 		bytes, exists, err = util.ReadFileIfExists(config.RunfileAbs)

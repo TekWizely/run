@@ -29,7 +29,7 @@ func ProcessAST(ast *Ast) *runfile.Runfile {
 	rf.Scope.PutAttr(".RUN", config.RunBin)
 	rf.Scope.PutAttr(".RUNFILE", config.RunfileAbs)
 	rf.Scope.PutAttr(".RUNFILE.DIR", config.RunfileAbsDir)
-	rf.Scope.PutAttr(".SELF.RUNFILE", config.CurrentRunfileAbs)
+	rf.Scope.PutAttr(".SELF", config.CurrentRunfileAbs)
 	rf.Scope.PutAttr(".SELF.DIR", config.CurrentRunfileAbsDir)
 	for _, n := range ast.nodes {
 		n.Apply(rf)
@@ -44,13 +44,13 @@ func ProcessAstRunfile(ast *Ast, rf *runfile.Runfile) {
 	// Seed attributes
 	// Save current values, restore before leaving
 	//
-	selfRunfileBak, _ := rf.Scope.GetAttr(".SELF.RUNFILE")
+	selfRunfileBak, _ := rf.Scope.GetAttr(".SELF")
 	selfRunfileDirBak, _ := rf.Scope.GetAttr(".SELF.DIR")
 	defer func() {
-		rf.Scope.PutAttr(".SELF.RUNFILE", selfRunfileBak)
+		rf.Scope.PutAttr(".SELF", selfRunfileBak)
 		rf.Scope.PutAttr(".SELF.DIR", selfRunfileDirBak)
 	}()
-	rf.Scope.PutAttr(".SELF.RUNFILE", config.CurrentRunfileAbs)
+	rf.Scope.PutAttr(".SELF", config.CurrentRunfileAbs)
 	rf.Scope.PutAttr(".SELF.DIR", config.CurrentRunfileAbsDir)
 	for _, n := range ast.nodes {
 		n.Apply(rf)

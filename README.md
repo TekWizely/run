@@ -75,6 +75,13 @@ In run, the entire script is executed within a single sub-shell.
    - [Referencing Other Variables](#referencing-other-variables)
    - [Shell Substitution](#shell-substitution)
    - [Conditional Assignment](#conditional-assignment)
+ - [Runfile Attributes](#runfile-attributes)
+   - [`.SHELL`](#runfile-attributes)
+   - [`.RUN`](#runfile-attributes)
+   - [`.RUNFILE`](#runfile-attributes)
+   - [`.RUNFILE.DIR`](#runfile-attributes)
+   - [`.SELF`](#runfile-attributes)
+   - [`.SELF.DIR`](#runfile-attributes)
  - [Assertions](#assertions)
  - [Includes](#includes)
    - [File Globbing](#file-globbing)
@@ -761,6 +768,24 @@ NAME="Newman" run hello
 
 Hello, Newman
 ```
+
+----------------------
+### Runfile Attributes
+
+Attributes are special variables used by the Run engine.
+
+Their names start with `.` to avoid colliding with [runfile variables](#runfile-variables) and environment variables.<br/>
+
+Following is the list of Run's attributes:
+
+| Attribute      | Description
+|----------------|------------
+| `.SHELL`       | Contains the shell command that will be used to execute command scripts. See [Script Shells](#script-shells) for more details.
+| `.RUN`         | Contains the absolute path of the run binary currently in use. Useful for [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles).
+| `.RUNFILE`     | Contains the absolute path of the **primary** Runfile.
+| `.RUNFILE.DIR` | Contains the absolute path of the parent folder of the **primary** runfile.
+| `.SELF`        | Contains the absolute path of the **current** (primary or included) runfile.
+| `.SELF.DIR`    | Contains the absolute path of the parent folder of the **current** runfile.
 
 --------------
 ### Assertions

@@ -175,10 +175,13 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	}
 	// Doc Line
 	//
-	if tryPeekType(p, lexer.TokenConfigDescLine) {
-		line := p.Next()
+	if tryPeekType(p, lexer.TokenConfigDescLineStart) {
+		p.Next()
+		ctx.pushLexFn(ctx.l.Fn)
+		ctx.setLexFn(lexer.LexDocBlockNQString)
+		line := expectDocNQString(ctx, p)
 		cmdConfig = &ast.CmdConfig{}
-		cmdConfig.Desc = append(cmdConfig.Desc, &ast.ScopeValueRunes{Value: line.Value()})
+		cmdConfig.Desc = append(cmdConfig.Desc, line)
 		p.Clear()
 		tryMatchCmd(ctx, p, cmdConfig)
 		return parseMain

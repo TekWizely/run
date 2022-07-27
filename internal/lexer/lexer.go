@@ -94,11 +94,8 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 			//
 			if matchOneOrMore(l, isSpaceOrTab) {
 				l.Clear()
-				if matchOneOrMore(l, isPrintNonReturn) {
-					l.EmitToken(TokenConfigDescLine)
-					if matchNewline(l) {
-						l.Clear()
-					}
+				if l.CanPeek(1) && isPrintNonReturn(l.Peek(1)) {
+					l.EmitToken(TokenConfigDescLineStart)
 					return LexMain
 				}
 			}
@@ -536,7 +533,7 @@ func LexDocBlockDesc(ctx *LexContext, l *lexer.Lexer) LexFn {
 			// Desc line
 			//
 			ctx.PushFn(LexDocBlockDesc)
-			return lexDocBlockNQString
+			return LexDocBlockNQString
 		}
 		return LexDocBlockDesc
 	}
@@ -545,9 +542,9 @@ func LexDocBlockDesc(ctx *LexContext, l *lexer.Lexer) LexFn {
 	return nil
 }
 
-// lexDocBlockNQString
+// LexDocBlockNQString lexes a doc block comment line
 //
-func lexDocBlockNQString(ctx *LexContext, l *lexer.Lexer) LexFn {
+func LexDocBlockNQString(ctx *LexContext, l *lexer.Lexer) LexFn {
 	switch {
 	// Consume a run of printable, non-escape characters
 	//
@@ -568,7 +565,7 @@ func lexDocBlockNQString(ctx *LexContext, l *lexer.Lexer) LexFn {
 	//
 	case l.CanPeek(1) && l.Peek(1) == runeDollar:
 		if l.CanPeek(2) && l.Peek(2) == runeLBrace {
-			ctx.PushFn(lexDocBlockNQString)
+			ctx.PushFn(LexDocBlockNQString)
 			l.EmitType(TokenVarRefStart)
 			return LexVarRef
 		}
@@ -580,7 +577,7 @@ func lexDocBlockNQString(ctx *LexContext, l *lexer.Lexer) LexFn {
 		}
 		return nil
 	}
-	return lexDocBlockNQString
+	return LexDocBlockNQString
 }
 
 // LexDocBlockAttr lexes a doc block attribute line
@@ -636,7 +633,7 @@ func LexCmdConfigShell(ctx *LexContext, l *lexer.Lexer) LexFn {
 //
 func LexCmdConfigUsage(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	return lexDocBlockNQString
+	return LexDocBlockNQString
 }
 
 // LexCmdConfigOpt matches: name [-l] [--long] [<label>] ["desc"]
@@ -720,7 +717,7 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 
 	// Desc?
 	//
-	return lexDocBlockNQString
+	return LexDocBlockNQString
 }
 
 // LexCmdShellName lexes a command's shell

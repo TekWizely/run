@@ -737,43 +737,64 @@ func LexCmdShellName(_ *LexContext, l *lexer.Lexer) LexFn {
 //
 func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	if !matchID(l) {
-		l.EmitError("expecting variable name")
-		return nil
-	}
-	l.EmitToken(TokenID)
-	ignoreSpace(l)
-
 	switch {
-	// ','
+	// Variable
 	//
-	case peekRuneEquals(l, runeComma):
-		for matchRune(l, runeComma) {
-			l.EmitType(TokenComma)
-			ignoreSpace(l)
-			if !matchID(l) {
-				l.EmitError("expecting variable name")
-				return nil
+	case matchID(l):
+		l.EmitToken(TokenID)
+		ignoreSpace(l)
+
+		switch {
+		// ','
+		//
+		case peekRuneEquals(l, runeComma):
+			for matchRune(l, runeComma) {
+				l.EmitType(TokenComma)
+				ignoreSpace(l)
+				if !matchID(l) {
+					l.EmitError("expecting variable name")
+					return nil
+				}
+				l.EmitToken(TokenID)
+				ignoreSpace(l)
 			}
-			l.EmitToken(TokenID)
-			ignoreSpace(l)
+		// '='
+		//
+		case matchRune(l, runeEquals):
+			l.EmitType(TokenEquals)
+		// ':='
+		//
+		case matchRune(l, runeColon):
+			expectRune(l, runeEquals, "expecting '='")
+			l.EmitType(TokenEquals)
+		// '?='
+		//
+		case matchRune(l, runeQMark):
+			expectRune(l, runeEquals, "expecting '='")
+			l.EmitType(TokenQMarkEquals)
+		default:
+			// No default
 		}
-	// '='
+	// Attribute
 	//
-	case matchRune(l, runeEquals):
-		l.EmitType(TokenEquals)
-	// ':='
-	//
-	case matchRune(l, runeColon):
-		expectRune(l, runeEquals, "expecting '='")
-		l.EmitType(TokenEquals)
-	// '?='
-	//
-	case matchRune(l, runeQMark):
-		expectRune(l, runeEquals, "expecting '='")
-		l.EmitType(TokenQMarkEquals)
+	case matchDotID(l):
+		l.EmitToken(TokenDotID)
+		ignoreSpace(l)
+		// 'AS'
+		//
+		if l.CanPeek(3) &&
+			(l.Peek(1) == 'a' || l.Peek(1) == 'A') &&
+			(l.Peek(2) == 's' || l.Peek(2) == 'S') &&
+			isSpaceOrTab(l.Peek(3)) {
+			l.Next()
+			l.Next()
+			l.EmitType(TokenAs)
+			ignoreSpace(l)
+			matchID(l)
+			l.EmitToken(TokenID)
+		}
 	default:
-		// No default
+		l.EmitError("expecting attribute or variable name")
 	}
 
 	return nil

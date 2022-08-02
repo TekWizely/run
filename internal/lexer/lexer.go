@@ -737,66 +737,67 @@ func LexCmdShellName(_ *LexContext, l *lexer.Lexer) LexFn {
 //
 func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	ignoreSpace(l)
-	switch {
-	// Variable
-	//
-	case matchID(l):
-		l.EmitToken(TokenID)
-		ignoreSpace(l)
-
+	commaMode := false
+	for hasNext := true; hasNext; {
+		hasNext = false
 		switch {
+		// Variable
+		//
+		case matchID(l):
+			l.EmitToken(TokenID)
+			ignoreSpace(l)
+			if !commaMode {
+				switch {
+				// '='
+				//
+				case matchRune(l, runeEquals):
+					l.EmitType(TokenEquals)
+					return nil // Terminal, only 1 per line
+				// ':='
+				//
+				case matchRune(l, runeColon):
+					expectRune(l, runeEquals, "expecting '='")
+					l.EmitType(TokenEquals)
+					return nil // Terminal, only 1 per line
+				// '?='
+				//
+				case matchRune(l, runeQMark):
+					expectRune(l, runeEquals, "expecting '='")
+					l.EmitType(TokenQMarkEquals)
+					return nil // Terminal, only 1 per line
+				}
+			}
+		// Attribute
+		//
+		case matchDotID(l):
+			l.EmitToken(TokenDotID)
+			ignoreSpace(l)
+			// 'AS'
+			//
+			if l.CanPeek(3) &&
+				(l.Peek(1) == 'a' || l.Peek(1) == 'A') &&
+				(l.Peek(2) == 's' || l.Peek(2) == 'S') &&
+				isSpaceOrTab(l.Peek(3)) {
+				l.Next()
+				l.Next()
+				l.EmitType(TokenAs)
+				ignoreSpace(l)
+				matchID(l)
+				l.EmitToken(TokenID)
+			}
+		default:
+			l.EmitError("expecting attribute or variable name")
+		}
 		// ','
 		//
-		case peekRuneEquals(l, runeComma):
-			for matchRune(l, runeComma) {
-				l.EmitType(TokenComma)
-				ignoreSpace(l)
-				if !matchID(l) {
-					l.EmitError("expecting variable name")
-					return nil
-				}
-				l.EmitToken(TokenID)
-				ignoreSpace(l)
-			}
-		// '='
-		//
-		case matchRune(l, runeEquals):
-			l.EmitType(TokenEquals)
-		// ':='
-		//
-		case matchRune(l, runeColon):
-			expectRune(l, runeEquals, "expecting '='")
-			l.EmitType(TokenEquals)
-		// '?='
-		//
-		case matchRune(l, runeQMark):
-			expectRune(l, runeEquals, "expecting '='")
-			l.EmitType(TokenQMarkEquals)
-		default:
-			// No default
-		}
-	// Attribute
-	//
-	case matchDotID(l):
-		l.EmitToken(TokenDotID)
-		ignoreSpace(l)
-		// 'AS'
-		//
-		if l.CanPeek(3) &&
-			(l.Peek(1) == 'a' || l.Peek(1) == 'A') &&
-			(l.Peek(2) == 's' || l.Peek(2) == 'S') &&
-			isSpaceOrTab(l.Peek(3)) {
-			l.Next()
-			l.Next()
-			l.EmitType(TokenAs)
+		if peekRuneEquals(l, runeComma) {
+			matchRune(l, runeComma)
+			l.EmitType(TokenComma)
 			ignoreSpace(l)
-			matchID(l)
-			l.EmitToken(TokenID)
+			commaMode = true
+			hasNext = true
 		}
-	default:
-		l.EmitError("expecting attribute or variable name")
 	}
-
 	return nil
 }
 

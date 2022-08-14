@@ -142,24 +142,41 @@ func NewScopeValueNodeList1(value ScopeValueNode) *ScopeValueNodeList {
 	return &ScopeValueNodeList{Values: []ScopeValueNode{value}}
 }
 
-// ScopeExportList contains a list of exported vars.
+// ScopeVarExport exports a variable.
 //
-type ScopeExportList struct {
-	Names []string
+type ScopeVarExport struct {
+	VarName string
 }
 
-// NewScopeExportList1 is a convenience method for wrapping a single export.
+// NewVarExport is a convenience method for exporting variables.
 //
-func NewScopeExportList1(name string) *ScopeExportList {
-	return &ScopeExportList{[]string{name}}
+func NewVarExport(varName string) *ScopeVarExport {
+	return &ScopeVarExport{VarName: varName}
 }
 
 // Apply applies the node to the scope.
 //
-func (a *ScopeExportList) Apply(s *runfile.Scope) {
-	for _, name := range a.Names {
-		s.AddExport(name)
-	}
+func (a *ScopeVarExport) Apply(s *runfile.Scope) {
+	s.ExportVar(a.VarName)
+}
+
+// ScopeAttrExport exports an attribute.
+//
+type ScopeAttrExport struct {
+	AttrName string
+	VarName  string
+}
+
+// NewAttrExport is a convenience method for exporting attributes.
+//
+func NewAttrExport(attrName string, varName string) *ScopeAttrExport {
+	return &ScopeAttrExport{AttrName: attrName, VarName: varName}
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeAttrExport) Apply(s *runfile.Scope) {
+	s.ExportAttr(a.AttrName, a.VarName)
 }
 
 // ScopeAssert asserts the test, exiting with message on failure.
@@ -388,13 +405,17 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	}
 	// Exports
 	//
-	for _, name := range r.Scope.GetExports() {
-		cmd.Scope.AddExport(name)
+	for _, export := range r.Scope.GetVarExports() {
+		cmd.Scope.ExportVar(export.VarName)
 	}
-	for _, nameList := range a.Config.Exports {
-		for _, name := range nameList.Names {
-			cmd.Scope.AddExport(name)
-		}
+	for _, export := range r.Scope.GetAttrExports() {
+		cmd.Scope.ExportAttr(export.VarName, export.AttrName)
+	}
+	for _, export := range a.Config.VarExports {
+		cmd.Scope.ExportVar(export.VarName)
+	}
+	for _, export := range a.Config.AttrExports {
+		cmd.Scope.ExportAttr(export.AttrName, export.VarName)
 	}
 	// Vars
 	// Start with copy of global vars
@@ -449,13 +470,14 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 // CmdConfig wraps a command config.
 //
 type CmdConfig struct {
-	Shell   string
-	Desc    []ScopeValueNode
-	Usages  []ScopeValueNode
-	Opts    []*CmdOpt
-	Vars    []scopeNode
-	Exports []*ScopeExportList
-	Asserts []*CmdAssert
+	Shell       string
+	Desc        []ScopeValueNode
+	Usages      []ScopeValueNode
+	Opts        []*CmdOpt
+	Vars        []scopeNode
+	VarExports  []*ScopeVarExport
+	AttrExports []*ScopeAttrExport
+	Asserts     []*CmdAssert
 }
 
 // CmdOpt wraps a command option.
@@ -604,11 +626,18 @@ type ScopeValueShell struct {
 func (a *ScopeValueShell) Apply(s *runfile.Scope) string {
 	cmd := a.Cmd.Apply(s)
 	env := make(map[string]string)
-	for _, name := range s.GetExports() {
-		if value, ok := s.GetVar(name); ok {
-			env[name] = value
+	for _, export := range s.GetVarExports() {
+		if value, ok := s.GetVar(export.VarName); ok {
+			env[export.VarName] = value
 		} else {
-			log.Printf("WARNING: exported variable not defined: '%s'", name)
+			log.Printf("WARNING: exported variable not defined: '%s'", export.VarName)
+		}
+	}
+	for _, export := range s.GetAttrExports() {
+		if value, ok := s.GetAttr(export.AttrName); ok {
+			env[export.VarName] = value
+		} else {
+			log.Printf("WARNING: exported attribute not defined: '%s'", export.AttrName)
 		}
 	}
 	capturedOutput := &strings.Builder{}

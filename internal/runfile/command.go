@@ -268,11 +268,11 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) ([]string, int) {
 	// TODO Maybe make args property instead of stashing in vars?
 	for name, value := range stringValues {
 		cmd.Scope.Vars[name] = value.String()
-		cmd.Scope.AddExport(name)
+		cmd.Scope.ExportVar(name)
 	}
 	for name, value := range boolValues {
 		cmd.Scope.Vars[name] = value.String()
-		cmd.Scope.AddExport(name)
+		cmd.Scope.ExportVar(name)
 	}
 	return flags.Args(), 0
 }
@@ -443,11 +443,18 @@ func RunCommand(cmd *RunCmd) int {
 		return exitCode
 	}
 	env := make(map[string]string)
-	for _, name := range cmd.Scope.GetExports() {
-		if value, ok := cmd.Scope.GetVar(name); ok {
-			env[name] = value
+	for _, export := range cmd.Scope.GetVarExports() {
+		if value, ok := cmd.Scope.GetVar(export.VarName); ok {
+			env[export.VarName] = value
 		} else {
-			log.Printf("WARNING: exported variable not defined: '%s'", name)
+			log.Printf("WARNING: exported variable not defined: '%s'", export.VarName)
+		}
+	}
+	for _, export := range cmd.Scope.GetAttrExports() {
+		if value, ok := cmd.Scope.GetAttr(export.AttrName); ok {
+			env[export.VarName] = value
+		} else {
+			log.Printf("WARNING: exported attribute not defined: '%s'", export.AttrName)
 		}
 	}
 	// Check Asserts - Uses global .SHELL

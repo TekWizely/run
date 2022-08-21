@@ -409,7 +409,7 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 		cmd.Scope.ExportVar(export.VarName)
 	}
 	for _, export := range r.Scope.GetAttrExports() {
-		cmd.Scope.ExportAttr(export.VarName, export.AttrName)
+		cmd.Scope.ExportAttr(export.AttrName, export.VarName)
 	}
 	for _, export := range a.Config.VarExports {
 		cmd.Scope.ExportVar(export.VarName)

@@ -94,7 +94,8 @@ func Parse(l *lexer.LexContext) *ast.Ast {
 //
 func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	var (
-		name      string
+		varName   string
+		attrName  string
 		valueList ast.ScopeValueNode
 		cmdConfig *ast.CmdConfig
 		ok        bool
@@ -113,33 +114,56 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 		ctx.pushLexFn(ctx.l.Fn)
 		ctx.pushLexFn(lexer.LexExpectNewline)
 		ctx.setLexFn(lexer.LexExport)
-		name = expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
-		switch {
-		// '=' | ':=''
-		//
-		case tryPeekType(p, lexer.TokenEquals):
-			p.Next()
-			valueList = expectAssignmentValue(ctx, p)
-			ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
-			ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
-		// '?='
-		//
-		case tryPeekType(p, lexer.TokenQMarkEquals):
-			p.Next()
-			valueList = expectAssignmentValue(ctx, p)
-			ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
-			ctx.ast.AddScopeNode(&ast.ScopeExportList{Names: []string{name}})
-		// ','
-		//
-		default:
-			exportList := &ast.ScopeExportList{}
-			exportList.Names = append(exportList.Names, name)
-			for tryPeekType(p, lexer.TokenComma) {
-				p.Next()
-				name = expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
-				exportList.Names = append(exportList.Names, name)
+		commaMode := false
+		for hasNext := true; hasNext; {
+			hasNext = false
+			if tryPeekType(p, lexer.TokenID) {
+				varName = p.Next().Value()
+				switch {
+				// '=' | ':=''
+				//
+				case !commaMode && tryPeekType(p, lexer.TokenEquals):
+					p.Next()
+					valueList = expectAssignmentValue(ctx, p)
+					ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: varName, Value: valueList})
+					ctx.ast.AddScopeNode(ast.NewVarExport(varName))
+				// '?='
+				//
+				case !commaMode && tryPeekType(p, lexer.TokenQMarkEquals):
+					p.Next()
+					valueList = expectAssignmentValue(ctx, p)
+					ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: varName, Value: valueList})
+					ctx.ast.AddScopeNode(ast.NewVarExport(varName))
+				// Export existing variable
+				//
+				default:
+					ctx.ast.AddScopeNode(ast.NewVarExport(varName))
+				}
+			} else {
+				attrName = expectTokenType(p, lexer.TokenDotID, "expecting TokenID or TokenDotID").Value()
+				// Let's go ahead and normalize this now
+				//
+				attrName = strings.ToUpper(attrName)
+				// 'AS'
+				//
+				if tryPeekType(p, lexer.TokenAs) {
+					p.Next()
+					varName = expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
+				} else {
+					// Variable name based on munged attribute name
+					//
+					varName = attrName[1:]                          // Strip leading '.'
+					varName = strings.ReplaceAll(varName, ".", "_") // s/\./_/
+				}
+				ctx.ast.AddScopeNode(ast.NewAttrExport(attrName, varName))
 			}
-			ctx.ast.AddScopeNode(exportList)
+			// ','
+			//
+			if tryPeekTypes(p, lexer.TokenComma) {
+				p.Next()
+				commaMode = true
+				hasNext = true
+			}
 		}
 		expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 		p.Clear()
@@ -196,29 +220,29 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	}
 	// DotAssignment
 	//
-	if name, ok = tryMatchDotAssignmentStart(p); ok {
-		ctx.pushLexFn(ctx.l.Fn)
-		valueList = expectAssignmentValue(ctx, p)
+	if attrName, ok = tryMatchDotAssignmentStart(p); ok {
 		// Let's go ahead and normalize this now
 		//
-		name = strings.ToUpper(name)
-		ctx.ast.AddScopeNode(&ast.ScopeAttrAssignment{Name: name, Value: valueList})
+		attrName = strings.ToUpper(attrName)
+		ctx.pushLexFn(ctx.l.Fn)
+		valueList = expectAssignmentValue(ctx, p)
+		ctx.ast.AddScopeNode(&ast.ScopeAttrAssignment{Name: attrName, Value: valueList})
 		return parseMain
 	}
 	// Variable Assignment
 	//
-	if name, ok = tryMatchAssignmentStart(p); ok {
+	if varName, ok = tryMatchAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.Fn)
 		valueList = expectAssignmentValue(ctx, p)
-		ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: name, Value: valueList})
+		ctx.ast.AddScopeNode(&ast.ScopeVarAssignment{Name: varName, Value: valueList})
 		return parseMain
 	}
 	// Variable QAssignment
 	//
-	if name, ok = tryMatchQAssignmentStart(p); ok {
+	if varName, ok = tryMatchQAssignmentStart(p); ok {
 		ctx.pushLexFn(ctx.l.Fn)
 		valueList = expectAssignmentValue(ctx, p)
-		ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: name, Value: valueList})
+		ctx.ast.AddScopeNode(&ast.ScopeVarQAssignment{Name: varName, Value: valueList})
 		return parseMain
 	}
 	// Command
@@ -336,33 +360,57 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				ctx.pushLexFn(ctx.l.Fn)
 				ctx.pushLexFn(lexer.LexExpectNewline)
 				ctx.setLexFn(lexer.LexExport)
-				name := expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
-				switch {
-				// '=' | ':=''
-				//
-				case tryPeekType(p, lexer.TokenEquals):
-					p.Next()
-					valueList := expectAssignmentValue(ctx, p)
-					cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarAssignment{Name: name, Value: valueList})
-					cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
-				// '?='
-				//
-				case tryPeekType(p, lexer.TokenQMarkEquals):
-					p.Next()
-					valueList := expectAssignmentValue(ctx, p)
-					cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarQAssignment{Name: name, Value: valueList})
-					cmdConfig.Exports = append(cmdConfig.Exports, ast.NewScopeExportList1(name))
-				// ','
-				//
-				default:
-					exportList := &ast.ScopeExportList{}
-					exportList.Names = append(exportList.Names, name)
-					for tryPeekType(p, lexer.TokenComma) {
-						p.Next()
-						name = expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
-						exportList.Names = append(exportList.Names, name)
+				commaMode := false
+				for hasNext := true; hasNext; {
+					hasNext = false
+					if tryPeekType(p, lexer.TokenID) {
+						varName := expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
+						switch {
+						// '=' | ':=''
+						//
+						case !commaMode && tryPeekType(p, lexer.TokenEquals):
+							p.Next()
+							valueList := expectAssignmentValue(ctx, p)
+							cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarAssignment{Name: varName, Value: valueList})
+							cmdConfig.VarExports = append(cmdConfig.VarExports, ast.NewVarExport(varName))
+						// '?='
+						//
+						case !commaMode && tryPeekType(p, lexer.TokenQMarkEquals):
+							p.Next()
+							valueList := expectAssignmentValue(ctx, p)
+							cmdConfig.Vars = append(cmdConfig.Vars, &ast.ScopeVarQAssignment{Name: varName, Value: valueList})
+							cmdConfig.VarExports = append(cmdConfig.VarExports, ast.NewVarExport(varName))
+						// Export existing variable
+						//
+						default:
+							cmdConfig.VarExports = append(cmdConfig.VarExports, ast.NewVarExport(varName))
+						}
+					} else {
+						attrName := expectTokenType(p, lexer.TokenDotID, "expecting TokenID or TokenDotID").Value()
+						// Let's go ahead and normalize this now
+						//
+						attrName = strings.ToUpper(attrName)
+						// 'AS'
+						//
+						var varName string
+						if tryPeekType(p, lexer.TokenAs) {
+							p.Next()
+							varName = expectTokenType(p, lexer.TokenID, "expecting TokenID").Value()
+						} else {
+							// Variable name based on munged attribute name
+							//
+							varName = attrName[1:]                          // Strip leading '.'
+							varName = strings.ReplaceAll(varName, ".", "_") // s/\./_/
+						}
+						cmdConfig.AttrExports = append(cmdConfig.AttrExports, ast.NewAttrExport(attrName, varName))
 					}
-					cmdConfig.Exports = append(cmdConfig.Exports, exportList)
+					// ','
+					//
+					if tryPeekTypes(p, lexer.TokenComma) {
+						p.Next()
+						commaMode = true
+						hasNext = true
+					}
 				}
 				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 				p.Clear()
@@ -526,6 +574,11 @@ func expectVarRef(ctx *parseContext, p *parser.Parser) *ast.ScopeValueVar {
 	// Value
 	//
 	name := expectTokenType(p, lexer.TokenRunes, "expecting TokenRunes").Value()
+	// Let's go ahead and normalize this now if it's an attribute
+	//
+	if strings.HasPrefix(name, ".") {
+		name = strings.ToUpper(name)
+	}
 	// Close Brace
 	//
 	expectTokenType(p, lexer.TokenRBrace, "expecting TokenRBrace ('}')")

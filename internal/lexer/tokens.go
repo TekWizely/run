@@ -49,6 +49,7 @@ const (
 	TokenDBracketStringEnd   // ' ]]'
 
 	TokenExport
+	TokenAs
 	TokenAssert
 	TokenInclude
 	TokenCommand

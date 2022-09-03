@@ -82,6 +82,9 @@ In run, the entire script is executed within a single sub-shell.
    - [`.RUNFILE.DIR`](#runfile-attributes)
    - [`.SELF`](#runfile-attributes)
    - [`.SELF.DIR`](#runfile-attributes)
+   - [Exporting Attributes](#exporting-attributes)
+     - [Simple Export](#simple-export)
+     - [Export With Name](#export-with-name)
  - [Assertions](#assertions)
  - [Includes](#includes)
    - [File Globbing](#file-globbing)
@@ -786,6 +789,67 @@ Following is the list of Run's attributes:
 | `.RUNFILE.DIR` | Contains the absolute path of the parent folder of the **primary** runfile.
 | `.SELF`        | Contains the absolute path of the **current** (primary or included) runfile.
 | `.SELF.DIR`    | Contains the absolute path of the parent folder of the **current** runfile.
+
+
+#### Exporting Attributes
+
+In order to access an attribute's value within your commands, you'll need to assign them to an [exported variable](#exporting-variables).
+
+Older versions of Run required you to use a variable assignment:
+
+_Runfile_
+```
+EXPORT RUNFILE     := ${.RUNFILE}
+EXPORT RUNFILE_DIR := ${.RUNFILE.DIR}
+
+## Prints the value of .RUNFILE
+runfile:
+    echo "${RUNFILE}"
+
+## Prints the value of .RUNFILE.DIR
+runfile-dir:
+    echo "${RUNFILE_DIR}"
+```
+
+Newer versions of Run now support less verbose options:
+
+##### Simple Export
+
+You can quickly export an attribute with a default variable name:
+
+_Runfile_
+```
+EXPORT .RUNFILE, .RUNFILE.DIR
+
+## Prints the value of .RUNFILE
+runfile:
+    echo "${RUNFILE}"
+
+## Prints the value of .RUNFILE.DIR
+runfile-dir:
+    echo "${RUNFILE_DIR}"
+```
+
+With this technique, Run uses the attribute's name to determine the exported variable's name by:
+* Removing the leading `.` character
+* Substituting any remaining `.` characters with `_`
+
+##### Export With Name
+
+If you want to export an attribute with a non-default variable name, you can use the `AS` syntax:
+
+```
+EXPORT .RUNFILE     AS RF
+EXPORT .RUNFILE.DIR AS RFD
+
+## Prints the value of .RUNFILE
+runfile:
+    echo "${RF}"
+
+## Prints the value of .RUNFILE.DIR
+runfile-dir:
+    echo "${RFD}"
+```
 
 --------------
 ### Assertions

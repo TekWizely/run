@@ -11,6 +11,7 @@ module.exports = binwrap({
   ],
   urls: {
     "darwin-x64": root + "/run_" + version + "_darwin_amd64.tar.gz",
+    "darwin-arm64": root + "/run_" + version + "_darwin_arm64.tar.gz",
     "linux-x64": root + "/run_" + version + "_linux_amd64.tar.gz"
   }
 });

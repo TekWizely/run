@@ -4,7 +4,7 @@
 #
 # Usage:
 #
-#  GIT_SUMMARY=$(git describe --tags --dirty --always) goreleaser --rm-dist --skip-publish
+#  goreleaser --rm-dist --skip-publish [--snapshot]
 #
 project_name: run
 env:
@@ -18,14 +18,16 @@ builds:
       - CGO_ENABLED=0
     binary: run
     ldflags:
-      - -s -w -X "main.Version={{.Version}}" -X "main.BuildDate={{.Date}}" -X "main.GitSummary={{.Env.GIT_SUMMARY}}" -X "main.BuildTool=goreleaser"
+      - -s -w -X "main.Version={{.Version}}" -X "main.BuildDate={{.Date}}" -X "main.GitSummary={{.Summary}}" -X "main.BuildTool=goreleaser"
     goos:
       - darwin
       - linux
     goarch:
       - amd64
-      - 386
       - arm64
+    ignore:
+      - goos: linux
+        goarch: arm64
 archives:
   - replacements:
       darwin: darwin
@@ -34,14 +36,59 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ .Tag }}"
+  name_template: "{{ .Version }}"
 changelog:
-  sort:
+  sort: desc
   filters:
     exclude:
       - '^docs:'
       - '^test:'
+nfpms:
+  -
+    maintainer: TekWizely <tekwizely@gmail.com>
+    homepage: https://github.com/TekWizely/run
+    description: "Task runner that helps you easily manage and invoke small scripts and wrappers."
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+aurs:
+  -
+    skip_upload: "true"
+    maintainers:
+      - TekWizely <tekwizely@gmail.com>
+    homepage: https://github.com/TekWizely/run
+    description: "Task runner that helps you easily manage and invoke small scripts and wrappers."
+    license: MIT
+brews:
+  -
+    skip_upload: "true"
+    tap:
+      owner: Tekwizely
+      name: homebrew-tap
+    folder: Formula
+    #    url_template: "https://github.com/TekWizely/run/archive/{{ .Version }}.tar.gz"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    license: MIT
+    homepage: https://github.com/TekWizely/run
+    description: "Task runner that helps you easily manage and invoke small scripts and wrappers."
+    dependencies:
+      - name: go
+        type: build
+    #    install: |
+    #      system "go", "build", "-trimpath", "-ldflags", "-w -s -X \"main.BuildTool=brew via tekwizely/tap/run\"", "-o", bin/name
+    test: |
+      text = "Hello Homebrew!"
+      task = "hello"
+      (testpath/"Runfile").write <<~EOS
+      #{task}:
+      echo #{text}
+      EOS
+      assert_equal text, shell_output("#{bin}/#{name} #{task}").chomp
+
 release:
+  disable: true
   draft: true
   github:
     owner: TekWizely

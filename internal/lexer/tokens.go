@@ -13,6 +13,7 @@ const (
 	TokenDotID
 	TokenDashID
 
+	TokenBang
 	TokenColon
 	TokenComma
 	TokenEquals      // '=' | ':='
@@ -64,7 +65,7 @@ const (
 	TokenConfigOptName
 	TokenConfigOptShort
 	TokenConfigOptLong
-	TokenConfigOptValue
+	TokenConfigOptExample
 	TokenConfigExport
 	TokenConfigAssert
 

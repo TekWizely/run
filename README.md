@@ -6,7 +6,7 @@
 ![GitHub forks](https://img.shields.io/github/forks/TekWizely/run?style=social)
 ![Twitter Follow](https://img.shields.io/twitter/follow/TekWizely?style=social)
 
-Do you find yourself using tools like `make` to manage non build-related scripts?
+Do you find yourself using tools like `make` to manage non-build-related scripts?
 
 Build tools are great, but they are not optimized for general script management.
 
@@ -55,6 +55,8 @@ In run, the entire script is executed within a single sub-shell.
  - [Title & Description](#title--description)
  - [Arguments](#arguments)
  - [Command-Line Options](#command-line-options)
+   - [Making Options Required](#making-options-required)
+   - [Providing A Default Option Value](#providing-a-default-option-value)
    - [Boolean (Flag) Options](#boolean-flag-options)
    - [Getting `-h` & `--help` For Free](#getting--h----help-for-free)
    - [Passing Options Directly Through to the Command Script](#passing-options-directly-through-to-the-command-script)
@@ -359,6 +361,69 @@ $ run hello -n Newman
 Hello, Newman
 ```
 
+#### Making Options Required
+
+You can use `!` to indicate that an option is required:
+
+```
+# OPTION NAME! -n,--name <name> Name to say hello to
+```
+
+##### Required Indicator on Help Text
+
+Required options will be indicated in help text:
+
+```
+  -n, --name <name> (required)
+        Name to say hello to
+```
+
+##### Error When Required Option Not Provided
+
+An error will be generated if a required option is not provided:
+
+```
+hello: ERROR: Missing required option:
+  -n, --name <name>
+        Name to say hello to
+```
+
+#### Explicitly Marking Options as "Optional"
+
+Although options are already *optional* by default, you can use `?` to explicitly indicate that an option is optional:
+
+```
+# OPTION NAME? -n,--name <name> Name to say hello to
+```
+
+**NOTE**: This exists mostly for parity with `!` and behaves the same as when it is not used
+
+#### Providing A Default Option Value
+
+You can use `?=` to specify a default value for an option, which will be used if the option is not provided:
+
+```
+# OPTION NAME ?= Newman -n,--name <name> Name to say hello to
+```
+
+_output_
+
+```
+$ run hello
+
+Hello, Newman
+```
+
+**Note**: Any standard variable assignment value can be used (quoted strings, variable references, etc)
+
+##### Default Indicator on Help Text
+
+Default values will be indicated in help text:
+
+```
+  -n, --name <name> (default: Newman)
+```
+
 #### Boolean (Flag) Options
 
 Declare flag options by omitting the `'<...>'` segment.
@@ -387,12 +452,47 @@ hello:
         Say hello to Newman
 ```
 
+##### Boolean Default Option Values
+
+You can specify a default value for boolean options, but they behave slightly different from standard options:
+
+```
+# OPTION NEWMAN ?= enabled --newman Say hello to Newman
+```
+
+###### Defaulted Value Always Assumed to be True
+
+The content of the default value text is not used to determine the option's default true/false value.
+
+Why?
+
+Since boolean values are already *always* `false` by default, providing a "default value" can *only* have the effect of defaulting the value to `true`.
+
+_output_
+
+```
+$ run hello
+
+Hello, Newman
+```
+
+###### Default Indicator on Help Text
+
+Even though a boolean option with provided default is always assumed to default to true, the default value text is still useful in that it will be displayed in the help text:
+
+```
+  --newman (default: enabled)
+```
+
+This allows you to give better messaging than just "true" or "1" (i.e "enabled" in this example)
+
 ##### Setting a Flag Option to TRUE
 
 ```
 $ run help --newman=true # true | True | TRUE
 $ run help --newman=1    # 1 | t | T
 $ run help --newman      # Empty value = true
+$ run help               # Default value = true if option has ?=
 
 Hello, Newman
 ```
@@ -402,7 +502,7 @@ Hello, Newman
 ```
 $ run help --newman=false # false | False | FALSE
 $ run help --newman=0     # 0 | f | F
-$ run help                # Default value = false
+$ run help                # Default value = false if option does not have ?=
 
 Hello, World
 
@@ -782,7 +882,7 @@ Their names start with `.` to avoid colliding with [runfile variables](#runfile-
 Following is the list of Run's attributes:
 
 | Attribute      | Description
-|----------------|------------
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------
 | `.SHELL`       | Contains the shell command that will be used to execute command scripts. See [Script Shells](#script-shells) for more details.
 | `.RUN`         | Contains the absolute path of the run binary currently in use. Useful for [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles).
 | `.RUNFILE`     | Contains the absolute path of the **primary** Runfile.
@@ -1523,7 +1623,7 @@ This means you will need to use `--` in order to pass options through to the mai
 ------------------------------------------
 ## Using direnv to auto-configure $RUNFILE
 
-A nice hack to make executing run tasks within your project more convenient is to use [direnv](https://direnv.net/) to auto-configure the `$RUNFILE` environment variable:
+A nice hack to make executing run tasks within your project more convenient is to use [direnv](https://direnv.net/) to autoconfigure the `$RUNFILE` environment variable:
 
 _create + edit + activate rc file_
 ```

@@ -344,14 +344,22 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				ctx.pushLexFn(ctx.l.Fn)
 				ctx.setLexFn(lexer.LexCmdConfigOpt)
 				opt.Name = expectTokenType(p, lexer.TokenConfigOptName, "expecting TokenConfigOptName").Value()
+				if tryPeekType(p, lexer.TokenBang) {
+					opt.Required = true
+					p.Next()
+				} else if tryPeekType(p, lexer.TokenQMarkEquals) {
+					p.Next()
+					ctx.pushLexFn(ctx.l.Fn)
+					opt.Default = expectAssignmentValue(ctx, p)
+				}
 				if tryPeekType(p, lexer.TokenConfigOptShort) {
 					opt.Short = []rune(p.Next().Value())[0]
 				}
 				if tryPeekType(p, lexer.TokenConfigOptLong) {
 					opt.Long = p.Next().Value()
 				}
-				if tryPeekType(p, lexer.TokenConfigOptValue) {
-					opt.Value = p.Next().Value()
+				if tryPeekType(p, lexer.TokenConfigOptExample) {
+					opt.Example = p.Next().Value()
 				}
 				opt.Desc = expectDocNQString(ctx, p)
 				cmdConfig.Opts = append(cmdConfig.Opts, opt)

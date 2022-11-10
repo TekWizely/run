@@ -636,9 +636,11 @@ func LexCmdConfigUsage(_ *LexContext, l *lexer.Lexer) LexFn {
 	return LexDocBlockNQString
 }
 
-// LexCmdConfigOpt matches: name [-l] [--long] [<label>] ["desc"]
+// LexCmdConfigOpt matches: name [ ! | ? | ?= VALUE ]
 //
 func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
+	// Whitespace
+	//
 	ignoreSpace(l)
 
 	// ID
@@ -649,6 +651,33 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	}
 	l.EmitToken(TokenConfigOptName)
 
+	// Whitespace
+	//
+	ignoreSpace(l)
+
+	// ? (mark opt as optional) | ?= (mark opt as optional with default)
+	// The naked optional indicator is itself optional :)
+	//
+	if matchRune(l, runeQMark) {
+		// ?=
+		if matchRune(l, runeEquals) {
+			l.EmitType(TokenQMarkEquals)
+		} else {
+			l.Clear() // Discard - Optional is already the default
+		}
+	} else
+	// ! (mark opt as required)
+	//
+	if matchRune(l, runeBang) {
+		l.EmitType(TokenBang)
+	}
+
+	return LexCmdConfigOptTail
+}
+
+// LexCmdConfigOptTail matches: [-l] [--long] [<label>] ["desc"]
+//
+func LexCmdConfigOptTail(_ *LexContext, l *lexer.Lexer) LexFn {
 	// Whitespace
 	//
 	ignoreSpace(l)
@@ -701,12 +730,12 @@ func LexCmdConfigOpt(_ *LexContext, l *lexer.Lexer) LexFn {
 	//
 	ignoreSpace(l)
 
-	// Value?
+	// Example?
 	//
 	if matchRune(l, runeLAngle) {
 		l.Clear()
-		matchOneOrMore(l, isConfigOptValue)
-		l.EmitToken(TokenConfigOptValue)
+		matchOneOrMore(l, isConfigOptExample)
+		l.EmitToken(TokenConfigOptExample)
 		expectRune(l, runeRAngle, "expecting '>'")
 		l.Clear()
 	}

@@ -94,72 +94,34 @@ func isWhitespace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
-// cmdFlagOpt describes a command option flag.
-//
-type cmdFlagOpt interface {
-	// Name fetches the name of the option variable name (not the arg short/long).
-	//
-	Name() string
-	// IsSet returns true if the flag was set from the arguments.
-	//
-	IsSet() bool
-	// Get retrieves the value.
-	// Implements flag.Getter.
-	//
-	Get() interface{}
-	// Set sets value.
-	// Implements flag.Value.
-	//
-	Set(string) error
-	// String gets the value as a string.
-	// Implements flag.Value.
-	//
-	String() string
-}
-
 // stringOpt
 //
 type stringOpt struct {
-	name  string // opt name, not short/long code
-	value *string
-	set   bool
+	runfileOpt *RunCmdOpt
+	value      *string
+	set        bool
 }
 
-func (a *stringOpt) Name() string {
-	return a.name
-}
-func (a *stringOpt) IsSet() bool {
-	return a.set
-}
 func (a *stringOpt) Set(value string) error {
 	*a.value = value
 	a.set = true
 	return nil
 }
-func (a *stringOpt) Get() interface{} {
-	return *a.value
-}
 func (a *stringOpt) String() string {
-	if a.value == nil {
-		return ""
+	if a.set {
+		return *a.value
 	}
-	return *a.value
+	return a.runfileOpt.Default
 }
 
 // boolOpt
 //
 type boolOpt struct {
-	name  string // opt name, not short/long code
-	value *bool
-	set   bool
+	runfileOpt *RunCmdOpt
+	value      *bool
+	set        bool
 }
 
-func (a *boolOpt) Name() string {
-	return a.name
-}
-func (a *boolOpt) IsSet() bool {
-	return a.set
-}
 func (a *boolOpt) Set(value string) error {
 	b, err := strconv.ParseBool(value)
 	if err != nil {
@@ -169,14 +131,11 @@ func (a *boolOpt) Set(value string) error {
 	a.set = true
 	return nil
 }
-func (a *boolOpt) Get() interface{} {
-	return *a.value
-}
 func (a *boolOpt) String() string {
-	if a.value == nil || !*a.value {
-		return ""
+	if (a.set && *a.value) || (!a.set && a.runfileOpt.HasDefault) {
+		return "1"
 	}
-	return "1"
+	return ""
 }
 func (a *boolOpt) IsBoolFlag() bool {
 	return true
@@ -211,19 +170,18 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) ([]string, int) {
 		if strings.EqualFold(opt.Long, "help") {
 			hasHelpLong = true
 		}
-		optName := opt.Name
-		var flagOpt cmdFlagOpt
-		// Bool or String?
+		var flagOpt flag.Value
+		// String or Bool?
 		//
-		if len(opt.Value) > 0 {
+		if len(opt.Example) > 0 {
 			var s = new(string)
-			var sOpt = &stringOpt{name: optName, value: s}
-			stringValues[optName] = sOpt
+			var sOpt = &stringOpt{runfileOpt: opt, value: s}
+			stringValues[opt.Name] = sOpt
 			flagOpt = sOpt
 		} else {
 			var b = new(bool)
-			var bOpt = &boolOpt{name: optName, value: b}
-			boolValues[optName] = bOpt
+			var bOpt = &boolOpt{runfileOpt: opt, value: b}
+			boolValues[opt.Name] = bOpt
 			flagOpt = bOpt
 		}
 		// Short?
@@ -265,16 +223,75 @@ func evaluateCmdOpts(cmd *RunCmd, args []string) ([]string, int) {
 		ShowCmdHelp(cmd)
 		return nil, 2
 	}
+	// Process options in the order they are defined
 	// TODO Maybe make args property instead of stashing in vars?
-	for name, value := range stringValues {
-		cmd.Scope.Vars[name] = value.String()
-		cmd.Scope.ExportVar(name)
+	//
+	var missingRequired []*RunCmdOpt
+	for _, opt := range cmd.Config.Opts {
+		// String or Bool?
+		//
+		if len(opt.Example) > 0 {
+			value := stringValues[opt.Name]
+			if value.runfileOpt.Required && !value.set {
+				missingRequired = append(missingRequired, value.runfileOpt)
+				continue
+			}
+			cmd.Scope.Vars[opt.Name] = value.String()
+			cmd.Scope.ExportVar(opt.Name)
+		} else {
+			value := boolValues[opt.Name]
+			if value.runfileOpt.Required && !value.set {
+				missingRequired = append(missingRequired, value.runfileOpt)
+				continue
+			}
+			cmd.Scope.Vars[opt.Name] = value.String()
+			cmd.Scope.ExportVar(opt.Name)
+		}
 	}
-	for name, value := range boolValues {
-		cmd.Scope.Vars[name] = value.String()
-		cmd.Scope.ExportVar(name)
+	// If any missing required options, error with message
+	//
+	if len(missingRequired) > 0 {
+		var option = "option"
+		b := &strings.Builder{}
+		for _, opt := range missingRequired {
+			if b.Len() > 0 {
+				option = "options"
+				b.WriteString("\n")
+			}
+			// Modeled after showCmdUsage - Keep in sync !
+			//
+			b.WriteString("  ")
+			b.WriteString(getCommonOptString(opt))
+			b.WriteString("\n        ")
+			b.WriteString(opt.Desc)
+		}
+		_, _ = fmt.Fprintf(config.ErrOut, "%s: ERROR: Missing required %s:\n%s\n", cmd.Name, option, b.String())
+		// ~= log.Fatal
+		return nil, 1
 	}
 	return flags.Args(), 0
+}
+
+func getCommonOptString(opt *RunCmdOpt) string {
+	b := &strings.Builder{}
+	if opt.Short != 0 {
+		b.WriteRune('-')
+		b.WriteRune(opt.Short)
+	}
+	if opt.Long != "" {
+		if opt.Short != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("--")
+		b.WriteString(opt.Long)
+	}
+	if opt.Example != "" {
+		b.WriteRune(' ')
+		b.WriteRune('<')
+		b.WriteString(opt.Example)
+		b.WriteRune('>')
+	}
+	return b.String()
 }
 
 // ShowCmdHelp shows cmd, desc, usage and opts
@@ -361,25 +378,17 @@ func showCmdUsage(cmd *RunCmd) {
 	for _, opt := range cmd.Config.Opts {
 		b := &strings.Builder{}
 		b.WriteString("  ")
-		if opt.Short != 0 {
-			b.WriteRune('-')
-			b.WriteRune(opt.Short)
-		}
-		if opt.Long != "" {
-			if opt.Short != 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString("--")
-			b.WriteString(opt.Long)
-		}
-		if opt.Value != "" {
+		b.WriteString(getCommonOptString(opt))
+		if opt.Required {
 			b.WriteRune(' ')
-			b.WriteRune('<')
-			b.WriteString(opt.Value)
-			b.WriteRune('>')
+			b.WriteString("(required)")
+		}
+		if opt.HasDefault {
+			b.WriteRune(' ')
+			b.WriteString(fmt.Sprintf("(default: %s)", opt.Default))
 		}
 		if opt.Desc != "" {
-			if opt.Short != 0 && opt.Long == "" && opt.Value == "" {
+			if opt.Short != 0 && opt.Long == "" && opt.Example == "" && !opt.Required && !opt.HasDefault {
 				b.WriteString("    ")
 			} else {
 				b.WriteString("\n        ") // Leading \n

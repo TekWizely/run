@@ -4,7 +4,6 @@
 [![All Contributors](https://img.shields.io/badge/all_contributors-5-orange.svg?style=flat-square)](#contributors-)<!-- ALL-CONTRIBUTORS-BADGE:END -->
 ![GitHub stars](https://img.shields.io/github/stars/TekWizely/run?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/TekWizely/run?style=social)
-![Twitter Follow](https://img.shields.io/twitter/follow/TekWizely?style=social)
 
 Do you find yourself using tools like `make` to manage non-build-related scripts?
 

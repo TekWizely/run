@@ -483,11 +483,13 @@ type CmdConfig struct {
 // CmdOpt wraps a command option.
 //
 type CmdOpt struct {
-	Name  string
-	Short rune
-	Long  string
-	Value string
-	Desc  ScopeValueNode
+	Name     string
+	Required bool
+	Default  ScopeValueNode
+	Short    rune
+	Long     string
+	Example  string
+	Desc     ScopeValueNode
 }
 
 // Apply applies the node to the command.
@@ -495,9 +497,14 @@ type CmdOpt struct {
 func (a *CmdOpt) Apply(c *runfile.RunCmd) *runfile.RunCmdOpt {
 	opt := &runfile.RunCmdOpt{}
 	opt.Name = a.Name
+	opt.Required = a.Required
+	opt.HasDefault = a.Default != nil
+	if opt.HasDefault {
+		opt.Default = a.Default.Apply(c.Scope)
+	}
 	opt.Short = a.Short
 	opt.Long = a.Long
-	opt.Value = a.Value
+	opt.Example = a.Example
 	opt.Desc = a.Desc.Apply(c.Scope)
 	return opt
 }

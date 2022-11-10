@@ -113,7 +113,7 @@ func isPrintNonReturn(r rune) bool {
 	return unicode.IsPrint(r) && r != '\r' && r != '\n'
 }
 
-func isConfigOptValue(r rune) bool {
+func isConfigOptExample(r rune) bool {
 	return unicode.IsPrint(r) && r != '\r' && r != '\n' && r != '\t' && r != '<' && r != '>'
 }
 

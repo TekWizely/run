@@ -25,11 +25,14 @@ func NewRunfile() *Runfile {
 // RunCmdOpt captures an OPTION
 //
 type RunCmdOpt struct {
-	Name  string
-	Short rune
-	Long  string
-	Value string
-	Desc  string
+	Name       string
+	Required   bool
+	HasDefault bool
+	Default    string
+	Short      rune
+	Long       string
+	Example    string
+	Desc       string
 }
 
 // RunCmdConfig captures the configuration for a command.

@@ -506,6 +506,10 @@ func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[str
 			log.Printf("ERROR: %s:%d: command not found: %s", cmd.Runfile, cmd.Line, cmdName)
 			return 2
 		}
+		if cmdMapEntry.Builtin {
+			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
 		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv)
 		if exitCode != 0 {
 			return exitCode
@@ -526,6 +530,10 @@ func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[str
 		var cmdExists bool
 		if cmdMapEntry, cmdExists = config.CommandMap[cmdName]; !cmdExists {
 			log.Printf("ERROR: %s:%d: command not found: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		if cmdMapEntry.Builtin {
+			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
 			return 2
 		}
 		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv)

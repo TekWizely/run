@@ -99,7 +99,8 @@ In run, the entire script is executed within a single sub-shell.
      - [First Registered Command Defines Default Documentation](#first-registered-command-defines-default-documentation)
      - [Commands Are Listed In The Order They Are Registered](#commands-are-listed-in-the-order-they-are-registered)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
-   - [.RUN & .RUNFILE Attributes](#run--runfile-attributes)
+   - [RUN / RUN.BEFORE / RUN.AFTER Actions](#run--runbefore--runafter-actions)
+   - [.RUN / .RUNFILE Attributes](#run--runfile-attributes)
  - [Script Shells](#script-shells)
    - [Per-Command Shell Config](#per-command-shell-config)
    - [Global Default Shell Config](#global-default-shell-config)
@@ -1347,22 +1348,85 @@ Notice that `command2` is still shown _between_ `command1` and `command3`, match
 --------------------------------------
 ### Invoking Other Commands & Runfiles
 
+#### RUN / RUN.BEFORE / RUN.AFTER Actions
+
+You can invoke other commands (with arguments) from your Runfile before or after your command executes:
+
+_Runfile_
+```
+##
+# RUN hello "Newman"
+# RUN.AFTER goodbye
+test:
+    echo "How are you?"
+
+hello:
+    echo "Hello, ${1:-World}"
+
+goodbye:
+    echo "Goodbye, now"
+```
+
+_output_
+```
+$ run test
+
+Hello, Newman
+How are you?
+Goodbye, now
+```
+
+*Note*: Any standard variable assignment value can be used (quoted strings, variable references, etc)
+
+##### Exported Variables
+
+Your command's exported environment variables are also exported to the invoked command:
+
+_exported variable example_
+```
+##
+# EXPORT NAME := "Newman"
+# RUN hello
+test:
+    echo "Goodbye, now"
+
+hello:
+  echo "Hello, ${NAME:-world}"
+```
+
+_output_
+```
+$ run test
+
+Hello, Newman
+Goodbye, now
+```
+
+*Notes*:
+* `RUN.BEFORE` is also supported, and behaves just like `RUN`
+* Commands are invoked in the order they are defined
+* Your command only runs if all _before_ commands return exit code zero (0)
+* _After_ commands only run if your command returns exit code zero (0)
+* Execution halts if *any* RUN returns a non-zero exit code
+* You cannot invoke _builtin_ commands (help, version, etc)
+
 #### .RUN / .RUNFILE Attributes
+
+If you need more control while invoking other commands, Run makes it possible to invoke commands, or even other Runfiles, from _within_ your command script.
+
 Run exposes the following attributes:
 
 * `.RUN` - Absolute path of the run binary currently in use
 * `.RUNFILE` - Absolute path of the current **primary** Runfile
 
-NOTE: Even from inside an [included](#includes) Runfile, `.RUNFILE` will always reference the primary Runfile
+NOTE: Even from inside an [included](#includes) Runfile, `.RUNFILE` will always reference the _primary_ Runfile
 
 Your command script can use these to invoke other commands:
 
 _Runfile_
 ```
 ##
-# Invokes hello
-# EXPORT RUN := ${.RUN}
-# EXPORT RUNFILE := ${.RUNFILE}
+# EXPORT .RUN, .RUNFILE
 test:
     "${RUN}" hello
 

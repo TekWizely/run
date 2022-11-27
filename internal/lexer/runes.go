@@ -63,12 +63,15 @@ func isMainToken(s string) bool {
 // Cmd Config Tokens
 //
 var cmdConfigTokens = map[string]token.Type{
-	"SHELL":  TokenConfigShell,
-	"USAGE":  TokenConfigUsage,
-	"OPTION": TokenConfigOpt,
-	"OPT":    TokenConfigOpt,
-	"EXPORT": TokenConfigExport,
-	"ASSERT": TokenConfigAssert,
+	"SHELL":      TokenConfigShell,
+	"USAGE":      TokenConfigUsage,
+	"OPTION":     TokenConfigOpt,
+	"OPT":        TokenConfigOpt,
+	"EXPORT":     TokenConfigExport,
+	"ASSERT":     TokenConfigAssert,
+	"RUN":        TokenConfigRunBefore,
+	"RUN.BEFORE": TokenConfigRunBefore,
+	"RUN.AFTER":  TokenConfigRunAfter,
 }
 
 func isAlpha(r rune) bool {

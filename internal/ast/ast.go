@@ -269,14 +269,9 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 				// Set new prefix so parse errors/line numbers will be relative to the correct file
 				// For brevity, use path relative to config.RunfileAbsDir if possible
 				//
-				var filenameRel string
-				if filenameRel, err = filepath.Rel(config.RunfileAbsDir, filename); err == nil && len(filenameRel) > 0 && !strings.HasPrefix(filenameRel, ".") {
-					log.SetPrefix(filenameRel + ": ")
-					config.CurrentRunfile = filenameRel
-				} else {
-					log.SetPrefix(filename + ": ")
-					config.CurrentRunfile = filename
-				}
+				filenameMaybeRel := util.TryMakeRelative(config.RunfileAbsDir, filename)
+				log.SetPrefix(filenameMaybeRel + ": ")
+				config.CurrentRunfile = filenameMaybeRel
 				config.CurrentRunfileAbs = filename
 				config.CurrentRunfileAbsDir = filepath.Dir(config.CurrentRunfileAbs)
 				// Parse the file
@@ -396,6 +391,22 @@ type Cmd struct {
 // Apply applies the node to the runfile.
 //
 func (a *Cmd) Apply(r *runfile.Runfile) {
+	r.Cmds = append(r.Cmds, a)
+}
+
+// GetCmd generates a Runfile command from the node.
+// Fulfills runfile.CmdProvider#GetCmd
+//
+func (a *Cmd) GetCmd(r *runfile.Runfile) *runfile.RunCmd {
+	return a.GetCmdEnv(r, map[string]string{})
+}
+
+// GetCmdEnv generates a Runfile command from the node and
+// a supplied starting env.
+// Provided env overrides the Runfile global env but not the command's env.
+// Fulfills runfile.CmdProvider#GetCmdEnv
+//
+func (a *Cmd) GetCmdEnv(r *runfile.Runfile, env map[string]string) *runfile.RunCmd {
 	cmd := &runfile.RunCmd{
 		Name:    a.Name,
 		Scope:   runfile.NewScope(),
@@ -425,8 +436,13 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	}
 	// Attrs
 	//
-	for k, v := range r.Scope.Attrs {
-		cmd.Scope.PutAttr(k, v)
+	for key, value := range r.Scope.Attrs {
+		cmd.Scope.PutAttr(key, value)
+	}
+	// Provided Environment
+	//
+	for key, value := range env {
+		cmd.Scope.PutVar(key, value)
 	}
 	// Config Environment
 	//
@@ -456,6 +472,16 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	for _, opt := range a.Config.Opts {
 		cmd.Config.Opts = append(cmd.Config.Opts, opt.Apply(cmd))
 	}
+	// Config 'Before' Runs
+	//
+	for _, cmdRun := range a.Config.BeforeRuns {
+		cmd.Config.BeforeRuns = append(cmd.Config.BeforeRuns, cmdRun.Apply(cmd.Scope))
+	}
+	// Config 'After' Runs
+	//
+	for _, cmdRun := range a.Config.AfterRuns {
+		cmd.Config.AfterRuns = append(cmd.Config.AfterRuns, cmdRun.Apply(cmd.Scope))
+	}
 	// Asserts - Global first, then Command
 	//
 	for _, assert := range r.Scope.Asserts {
@@ -464,7 +490,7 @@ func (a *Cmd) Apply(r *runfile.Runfile) {
 	for _, assert := range a.Config.Asserts {
 		cmd.Scope.AddAssert(assert.Apply(cmd.Scope))
 	}
-	r.Cmds = append(r.Cmds, cmd)
+	return cmd
 }
 
 // CmdConfig wraps a command config.
@@ -478,6 +504,8 @@ type CmdConfig struct {
 	VarExports  []*ScopeVarExport
 	AttrExports []*ScopeAttrExport
 	Asserts     []*CmdAssert
+	BeforeRuns  []*CmdRun
+	AfterRuns   []*CmdRun
 }
 
 // CmdOpt wraps a command option.
@@ -527,6 +555,24 @@ func (a *CmdAssert) Apply(s *runfile.Scope) *runfile.Assert {
 	assert.Test = a.Test.Apply(s)
 	assert.Message = strings.TrimSpace(a.Message.Apply(s))
 	return assert
+}
+
+// CmdRun wraps a command config RUN invocation.
+//
+type CmdRun struct {
+	Command string
+	Args    []ScopeValueNode
+}
+
+// Apply applies the node to the Scope.
+//
+func (a *CmdRun) Apply(s *runfile.Scope) *runfile.RunCmdRun {
+	cmdRun := &runfile.RunCmdRun{}
+	cmdRun.Command = a.Command
+	for _, arg := range a.Args {
+		cmdRun.Args = append(cmdRun.Args, arg.Apply(s))
+	}
+	return cmdRun
 }
 
 // ScopeAttrAssignment wraps an attribute assignment.

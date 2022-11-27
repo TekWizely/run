@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // DefaultIfEmpty returns default string of src string is empty.
@@ -78,4 +79,14 @@ func ReadFileIfExists(path string) ([]byte, bool, error) {
 	// If we get here, we have an error
 	//
 	return nil, false, err
+}
+
+// TryMakeRelative tries to generate a path for targetPath that is relative to basePath.
+// It returns either a path relative to basePath, if possible, or targetPath.
+//
+func TryMakeRelative(basePath string, targetPath string) string {
+	if rel, err := filepath.Rel(basePath, targetPath); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, ".") {
+		return rel
+	}
+	return targetPath
 }

@@ -9,6 +9,8 @@ import (
 const (
 	TokenNewline = lexer.TStart + iota
 
+	TokenNotNewline // Meta token
+
 	TokenID
 	TokenDotID
 	TokenDashID
@@ -68,6 +70,8 @@ const (
 	TokenConfigOptExample
 	TokenConfigExport
 	TokenConfigAssert
+	TokenConfigRunBefore
+	TokenConfigRunAfter
 
 	TokenConfigEnd
 

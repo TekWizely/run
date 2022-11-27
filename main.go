@@ -183,6 +183,7 @@ func main() {
 		config.RunfileAbsDir = filepath.Dir(config.RunfileAbs)
 		// Current runfile/dir values, also used for .SELF / .SELF.DIR attributes
 		//
+		config.CurrentRunfile = util.TryMakeRelative(config.RunfileAbsDir, config.RunfileAbs)
 		config.CurrentRunfileAbs = config.RunfileAbs
 		config.CurrentRunfileAbsDir = config.RunfileAbsDir
 		// Read the file (will re-check exists/stat, but that's the cost of the abstraction)
@@ -220,7 +221,7 @@ func main() {
 		Name:    "list",
 		Title:   "(builtin) List available commands",
 		Help:    func() { runfile.ListCommands() },
-		Run:     func() int { runfile.ListCommands(); return 0 },
+		Run:     func(_ []string, _ map[string]string) int { runfile.ListCommands(); return 0 },
 		Rename:  func(_ string) {},
 		Builtin: true,
 	}
@@ -230,7 +231,7 @@ func main() {
 		Name:    "help",
 		Title:   "(builtin) Show help for a command",
 		Help:    showRunHelp,
-		Run:     runfile.RunHelp,
+		Run:     func(_ []string, _ map[string]string) int { return runfile.RunHelp() },
 		Rename:  func(_ string) {},
 		Builtin: true,
 	}
@@ -246,7 +247,7 @@ func main() {
 		Name:    versionName,
 		Title:   "(builtin) Show run version",
 		Help:    func() { showVersion() },
-		Run:     func() int { showVersion(); return 0 },
+		Run:     func(_ []string, _ map[string]string) int { showVersion(); return 0 },
 		Rename:  func(_ string) {},
 		Builtin: true,
 	}
@@ -260,7 +261,8 @@ func main() {
 		firstRunCommandsByName := make(map[string]*runfile.RunCmd) // Keep track of first occurrences for name and default title/description
 		runCommandsByFileAndName := make(map[string]map[string]*runfile.RunCmd)
 		runCommandsByName := make(map[string]*runfile.RunCmd)
-		for _, newRunCommand := range rf.Cmds {
+		for _, cmdProvider := range rf.Cmds {
+			newRunCommand := cmdProvider.GetCmd(rf)
 			newRunCommandName := newRunCommand.Name     // Un-normalized name used for help
 			name := strings.ToLower(newRunCommand.Name) // normalize
 			// Keep track of which Runfile a command is registered in, to avoid dupes from same file
@@ -315,10 +317,12 @@ func main() {
 			runCommandsByNameForFile[name] = newRunCommand
 			runCommandsByName[name] = newRunCommand
 			cmd := &config.Command{
-				Name:    newRunCommandName,
-				Title:   newRunCommand.Title(),
-				Help:    func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(newRunCommand),
-				Run:     func(c *runfile.RunCmd) func() int { return func() int { return runfile.RunCommand(c) } }(newRunCommand),
+				Name:  newRunCommandName,
+				Title: newRunCommand.Title(),
+				Help:  func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(newRunCommand),
+				Run: func(a runfile.CmdProvider) func([]string, map[string]string) int {
+					return func(args []string, env map[string]string) int { return runfile.RunCommand(a, rf, args, env) }
+				}(cmdProvider),
 				Rename:  func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(newRunCommand),
 				Builtin: false,
 			}
@@ -391,7 +395,7 @@ func main() {
 		exitCode = 2
 		return
 	}
-	exitCode = cmd.Run()
+	exitCode = cmd.Run(os.Args, map[string]string{})
 }
 
 func parseArgs() int {
@@ -479,7 +483,7 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, exists bool, err erro
 					root = _root
 					break
 				}
-				// !$HOME can only match sub-directory
+				// !$HOME can only match subdirectory
 				//
 				if rel, err := filepath.Rel(_root, wd); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, ".") {
 					root = _root

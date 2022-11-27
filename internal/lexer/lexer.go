@@ -516,7 +516,7 @@ func LexDocBlockDesc(ctx *LexContext, l *lexer.Lexer) LexFn {
 			m = l.Marker()
 			// Possible attribute
 			//
-			if matchID(l) {
+			if matchConfigAttrID(l) {
 				id := strings.ToUpper(l.PeekToken())
 				if t, ok := cmdConfigTokens[id]; ok {
 					// We've gone this far, let's go ahead and emit
@@ -604,7 +604,7 @@ func LexDocBlockAttr(_ *LexContext, l *lexer.Lexer) LexFn {
 			l.Clear() // Discard
 			return LexDocBlockAttr
 		}
-		if matchID(l) {
+		if matchConfigAttrID(l) {
 			name := strings.ToUpper(l.PeekToken())
 			if t, ok := cmdConfigTokens[name]; ok {
 				l.EmitType(t)
@@ -830,6 +830,18 @@ func LexExport(_ *LexContext, l *lexer.Lexer) LexFn {
 	return nil
 }
 
+// LexExpectCommandName matches a dash-id or throws an error
+//
+func LexExpectCommandName(_ *LexContext, l *lexer.Lexer) LexFn {
+	ignoreSpace(l)
+	if !matchDashID(l) {
+		l.EmitError("expecting command name")
+		return nil
+	}
+	l.EmitToken(TokenDashID)
+	return nil
+}
+
 // LexIgnoreNewline matches + ignores whitespace + newline
 //
 func LexIgnoreNewline(_ *LexContext, l *lexer.Lexer) LexFn {
@@ -846,6 +858,18 @@ func LexExpectNewline(_ *LexContext, l *lexer.Lexer) LexFn {
 		l.EmitError("expecting end of line")
 	}
 	l.EmitType(TokenNewline)
+	return nil
+}
+
+// LexMaybeNewline eats current whitespace, then emits either TokenNewline or TokenNotNewline
+//
+func LexMaybeNewline(_ *LexContext, l *lexer.Lexer) LexFn {
+	ignoreSpace(l)
+	if matchNewline(l) {
+		l.EmitType(TokenNewline)
+	} else {
+		l.EmitType(TokenNotNewline)
+	}
 	return nil
 }
 
@@ -965,7 +989,7 @@ func matchNewlineOrEOF(l *lexer.Lexer) bool {
 	return !l.CanPeek(1)
 }
 
-// matchDotID matches [ '\.' [a-zA-Z] [a-zA-Z0-9_]* ( \. [a-zA-Z0-9_]+ )*
+// matchDotID matches '\.' [a-zA-Z] [a-zA-Z0-9_]* ( \. [a-zA-Z0-9_]+ )*
 //
 func matchDotID(l *lexer.Lexer) (ok bool) {
 	m := l.Marker()
@@ -998,4 +1022,27 @@ func matchID(l *lexer.Lexer) bool {
 //
 func matchDashID(l *lexer.Lexer) bool {
 	return matchOne(l, isAlphaUnder) && matchZeroOrMore(l, isAlphaNumUnderDash)
+}
+
+// matchConfigAttrID matches [a-zA-Z] [a-zA-Z0-9_]* ( \. [a-zA-Z0-9_]+ )*
+//
+func matchConfigAttrID(l *lexer.Lexer) (ok bool) {
+	m := l.Marker()
+	// If we don't match then reset
+	//
+	defer func() {
+		if !ok {
+			m.Apply()
+		}
+	}()
+	if matchOne(l, isAlpha) {
+		matchZeroOrMore(l, isAlphaNum)
+		for matchRune(l, runeDot) {
+			if !matchOneOrMore(l, isAlphaNum) {
+				return ok
+			}
+		}
+		return true
+	}
+	return false
 }

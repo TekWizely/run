@@ -435,6 +435,29 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				cmdConfig.Asserts = append(cmdConfig.Asserts, assert)
 				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 				p.Clear()
+			case lexer.TokenConfigRunBefore, lexer.TokenConfigRunAfter:
+				t = p.Next()
+				ctx.pushLexFn(ctx.l.Fn)
+				ctx.setLexFn(lexer.LexExpectCommandName)
+				command := p.Next().Value()
+				var args []ast.ScopeValueNode
+				for {
+					ctx.setLexFn(lexer.LexMaybeNewline)
+					if tryPeekType(p, lexer.TokenNotNewline) {
+						p.Next()
+						args = append(args, expectAssignmentValue(ctx, p))
+					} else {
+						break
+					}
+				}
+				cmdRun := &ast.CmdRun{Command: command, Args: args}
+				if t.Type() == lexer.TokenConfigRunBefore {
+					cmdConfig.BeforeRuns = append(cmdConfig.BeforeRuns, cmdRun)
+				} else {
+					cmdConfig.AfterRuns = append(cmdConfig.AfterRuns, cmdRun)
+				}
+				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
+				p.Clear()
 			default:
 				panic(fmt.Sprintf("%d:%d: Expecting cmd config statement", t.Line(), t.Column()))
 			}

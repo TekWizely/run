@@ -445,23 +445,34 @@ func RunHelp() int {
 
 // RunCommand executes a command returning an exit code
 //
-func RunCommand(cmd *RunCmd) int {
+func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[string]string) int {
+	cmd := cmdProvider.GetCmdEnv(rf, env)
 	exitCode := 0
-	os.Args, exitCode = evaluateCmdOpts(cmd, os.Args)
+	args, exitCode = evaluateCmdOpts(cmd, args)
 	if exitCode != 0 {
 		return exitCode
 	}
-	env := make(map[string]string)
+	cmdEnv := make(map[string]string)
+	// Original env keys are assumed to be exported,
+	// but their values may have changed, so we re-fetch them
+	//
+	for varName := range env {
+		if value, ok := cmd.Scope.GetVar(varName); ok {
+			cmdEnv[varName] = value
+		} else {
+			log.Printf("WARNING: exported variable not defined: '%s'", varName)
+		}
+	}
 	for _, export := range cmd.Scope.GetVarExports() {
 		if value, ok := cmd.Scope.GetVar(export.VarName); ok {
-			env[export.VarName] = value
+			cmdEnv[export.VarName] = value
 		} else {
 			log.Printf("WARNING: exported variable not defined: '%s'", export.VarName)
 		}
 	}
 	for _, export := range cmd.Scope.GetAttrExports() {
 		if value, ok := cmd.Scope.GetAttr(export.AttrName); ok {
-			env[export.VarName] = value
+			cmdEnv[export.VarName] = value
 		} else {
 			log.Printf("WARNING: exported attribute not defined: '%s'", export.AttrName)
 		}
@@ -473,7 +484,7 @@ func RunCommand(cmd *RunCmd) int {
 		shell = config.DefaultShell
 	}
 	for _, assert := range cmd.Scope.Asserts {
-		if exec.ExecuteTest(shell, assert.Test, env) != 0 {
+		if exec.ExecuteTest(shell, assert.Test, cmdEnv) != 0 {
 			// Print message if one configured
 			//
 			if len(assert.Message) > 0 {
@@ -485,8 +496,50 @@ func RunCommand(cmd *RunCmd) int {
 			return 1
 		}
 	}
+	// Run 'Before' Commands
+	//
+	for _, runCmd := range cmd.Config.BeforeRuns {
+		cmdName := strings.ToLower(runCmd.Command) // Normalize
+		var cmdMapEntry *config.Command
+		var cmdExists bool
+		if cmdMapEntry, cmdExists = config.CommandMap[cmdName]; !cmdExists {
+			log.Printf("ERROR: %s:%d: command not found: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		if cmdMapEntry.Builtin {
+			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv)
+		if exitCode != 0 {
+			return exitCode
+		}
+	}
 	// Execute script - Uses cmd shell
 	//
 	shell = cmd.Shell()
-	return exec.ExecuteCmdScript(shell, cmd.Script, os.Args, env)
+	exitCode = exec.ExecuteCmdScript(shell, cmd.Script, args, cmdEnv)
+	if exitCode != 0 {
+		return exitCode
+	}
+	// Run 'After' Commands
+	//
+	for _, runCmd := range cmd.Config.AfterRuns {
+		cmdName := strings.ToLower(runCmd.Command) // Normalize
+		var cmdMapEntry *config.Command
+		var cmdExists bool
+		if cmdMapEntry, cmdExists = config.CommandMap[cmdName]; !cmdExists {
+			log.Printf("ERROR: %s:%d: command not found: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		if cmdMapEntry.Builtin {
+			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv)
+		if exitCode != 0 {
+			return exitCode
+		}
+	}
+	return exitCode
 }

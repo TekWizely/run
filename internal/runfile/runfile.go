@@ -6,11 +6,18 @@ import (
 	"github.com/tekwizely/run/internal/config"
 )
 
+// CmdProvider allows us to construct commands
+// multiple times in different contexts.
+type CmdProvider interface {
+	GetCmd(r *Runfile) *RunCmd
+	GetCmdEnv(r *Runfile, env map[string]string) *RunCmd
+}
+
 // Runfile stores the processed file, ready to run.
 //
 type Runfile struct {
 	Scope *Scope
-	Cmds  []*RunCmd
+	Cmds  []CmdProvider
 }
 
 // NewRunfile is a convenience method.
@@ -18,11 +25,11 @@ type Runfile struct {
 func NewRunfile() *Runfile {
 	return &Runfile{
 		Scope: NewScope(),
-		Cmds:  []*RunCmd{},
+		Cmds:  []CmdProvider{},
 	}
 }
 
-// RunCmdOpt captures an OPTION
+// RunCmdOpt captures an OPTION.
 //
 type RunCmdOpt struct {
 	Name       string
@@ -35,13 +42,23 @@ type RunCmdOpt struct {
 	Desc       string
 }
 
+// RunCmdRun captures a command config RUN invocation.
+// TODO Better name?
+//
+type RunCmdRun struct {
+	Command string
+	Args    []string
+}
+
 // RunCmdConfig captures the configuration for a command.
 //
 type RunCmdConfig struct {
-	Shell  string
-	Desc   []string
-	Usages []string
-	Opts   []*RunCmdOpt
+	Shell      string
+	Desc       []string
+	Usages     []string
+	Opts       []*RunCmdOpt
+	BeforeRuns []*RunCmdRun
+	AfterRuns  []*RunCmdRun
 }
 
 // RunCmd captures a command.

@@ -8,9 +8,35 @@ import (
 	"runtime"
 )
 
+// CmdFlags captures various options for a command
+type CmdFlags int
+
+const (
+	// FlagHidden marks a command as Hidden
+	//
+	FlagHidden CmdFlags = 1 << iota
+
+	// FlagPrivate marks a command as Private
+	//
+	FlagPrivate
+)
+
+// Hidden returns true if flag represents Hidden
+//
+func (c CmdFlags) Hidden() bool {
+	return c&FlagHidden > 0
+}
+
+// Private returns true if flag represents Private
+//
+func (c CmdFlags) Private() bool {
+	return c&FlagPrivate > 0
+}
+
 // Command is an abstraction for a command, allowing us to mix runfile commands and custom comments (help, list, etc).
 //
 type Command struct {
+	Flags   CmdFlags
 	Name    string
 	Title   string
 	Help    func()

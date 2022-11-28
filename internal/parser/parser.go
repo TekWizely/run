@@ -257,6 +257,7 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 //
 func tryMatchCmd(ctx *parseContext, p *parser.Parser, cmdConfig *ast.CmdConfig) bool {
 	var (
+		flags config.CmdFlags
 		name  string
 		shell string
 		ok    bool
@@ -265,8 +266,7 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, cmdConfig *ast.CmdConfig) 
 	if cmdConfig == nil {
 		cmdConfig = &ast.CmdConfig{}
 	}
-
-	if name, shell, line, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
+	if flags, name, shell, line, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
 		return false
 	}
 	ctx.pushLexFn(ctx.l.Fn)
@@ -291,6 +291,7 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, cmdConfig *ast.CmdConfig) 
 		panic(parseError(p, "command '"+name+"' contains an empty script."))
 	}
 	ctx.ast.Add(&ast.Cmd{
+		Flags:   flags,
 		Name:    name,
 		Config:  cmdConfig,
 		Script:  script,
@@ -764,36 +765,47 @@ func expectTestString(_ *parseContext, p *parser.Parser) ast.ScopeValueNode {
 	panic(parseError(p, "expecting test string end token"))
 }
 
-// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]
+// tryMatchCmdHeaderWithShell matches [ [ 'CMD' ] [ '@' ] DASH_ID ( '(' ID ')' )? ( ':' | '{' ) ]
 //
-func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, string, int, bool) {
+func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (config.CmdFlags, string, string, int, bool) {
 	expectCommand := tryPeekType(p, lexer.TokenCommand)
 	if expectCommand {
 		expectTokenType(p, lexer.TokenCommand, "expecting TokenCommand")
 	} else {
 		expectCommand =
-			tryPeekType(p, lexer.TokenDashID) ||
+			tryPeekType(p, lexer.TokenAt) ||
+				tryPeekType(p, lexer.TokenBang) ||
+				tryPeekType(p, lexer.TokenDashID) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenColon) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLParen) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLBrace)
 	}
 	if !expectCommand {
-		return "", "", -1, false
+		return 0, "", "", -1, false
+	}
+	// Hidden (@)
+	//
+	var flags config.CmdFlags = 0
+	if tryPeekType(p, lexer.TokenAt) {
+		expectTokenType(p, lexer.TokenAt, "expecting TokenAt ('@')")
+		flags |= config.FlagHidden
+	} else
+	// Private (!)
+	//
+	if tryPeekType(p, lexer.TokenBang) {
+		expectTokenType(p, lexer.TokenBang, "expecting TokenBang ('!')")
+		flags |= config.FlagPrivate
 	}
 	// Name + Line
 	//
-	var name string
-	var line int
-
 	var t token.Token
 	if tryPeekType(p, lexer.TokenDashID) {
 		t = expectTokenType(p, lexer.TokenDashID, "expecting command name")
 	} else {
 		t = expectTokenType(p, lexer.TokenID, "expecting command name")
 	}
-	name = t.Value()
-	line = t.Line()
-
+	name := t.Value()
+	line := t.Line()
 	// Shell
 	//
 	shell := ""
@@ -810,7 +822,7 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (string, st
 		panic(parseError(p, "expecting TokenColon (':') or TokenLBrace ('{')"))
 	}
 	p.Clear()
-	return name, shell, line, true
+	return flags, name, shell, line, true
 }
 
 // expectCmdScript

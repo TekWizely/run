@@ -381,6 +381,7 @@ func (a *ScopeDParenString) Apply(s *runfile.Scope) string {
 // Cmd wraps a parsed command.
 //
 type Cmd struct {
+	Flags   config.CmdFlags
 	Name    string
 	Config  *CmdConfig
 	Script  []string
@@ -408,6 +409,7 @@ func (a *Cmd) GetCmd(r *runfile.Runfile) *runfile.RunCmd {
 //
 func (a *Cmd) GetCmdEnv(r *runfile.Runfile, env map[string]string) *runfile.RunCmd {
 	cmd := &runfile.RunCmd{
+		Flags:   a.Flags,
 		Name:    a.Name,
 		Scope:   runfile.NewScope(),
 		Script:  a.Script,

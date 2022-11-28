@@ -16,6 +16,7 @@ const (
 	// NOTE: You probably want matchNewline()
 	// runeNewline   = '\n'
 	// runeReturn    = '\r'
+	runeAt        = '@'
 	runeBang      = '!'
 	runeHash      = '#'
 	runeDollar    = '$'
@@ -41,8 +42,8 @@ const (
 // Single-Rune tokens
 //
 var (
-	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
-	singleTokens = []token.Type{TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
+	singleRunes  = []byte{runeAt, runeBang, runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
+	singleTokens = []token.Type{TokenAt, TokenBang, TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
 )
 var mainTokens = map[string]token.Type{
 	"COMMAND": TokenCommand,

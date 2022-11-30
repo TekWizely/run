@@ -263,11 +263,11 @@ func tryMatchCmd(ctx *parseContext, p *parser.Parser, cmdConfig *ast.CmdConfig) 
 		ok    bool
 		line  int
 	)
-	if cmdConfig == nil {
-		cmdConfig = &ast.CmdConfig{}
-	}
 	if flags, name, shell, line, ok = tryMatchCmdHeaderWithShell(ctx, p); !ok {
 		return false
+	}
+	if cmdConfig == nil {
+		cmdConfig = &ast.CmdConfig{}
 	}
 	ctx.pushLexFn(ctx.l.Fn)
 	if tryPeekType(p, lexer.TokenColon) {
@@ -773,9 +773,9 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (config.Cmd
 		expectTokenType(p, lexer.TokenCommand, "expecting TokenCommand")
 	} else {
 		expectCommand =
-			tryPeekType(p, lexer.TokenAt) ||
-				tryPeekType(p, lexer.TokenBang) ||
-				tryPeekType(p, lexer.TokenDashID) ||
+			tryPeekType(p, lexer.TokenDashID) ||
+				(tryPeekType(p, lexer.TokenDotID) && !strings.ContainsRune(strings.TrimPrefix(p.Peek(1).Value(), "."), '.')) ||
+				tryPeekType(p, lexer.TokenCommandDefID) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenColon) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLParen) ||
 				tryPeekTypes(p, lexer.TokenID, lexer.TokenLBrace)
@@ -783,29 +783,31 @@ func tryMatchCmdHeaderWithShell(ctx *parseContext, p *parser.Parser) (config.Cmd
 	if !expectCommand {
 		return 0, "", "", -1, false
 	}
-	// Hidden (@)
-	//
-	var flags config.CmdFlags = 0
-	if tryPeekType(p, lexer.TokenAt) {
-		expectTokenType(p, lexer.TokenAt, "expecting TokenAt ('@')")
-		flags |= config.FlagHidden
-	} else
-	// Private (!)
-	//
-	if tryPeekType(p, lexer.TokenBang) {
-		expectTokenType(p, lexer.TokenBang, "expecting TokenBang ('!')")
-		flags |= config.FlagPrivate
-	}
 	// Name + Line
 	//
 	var t token.Token
-	if tryPeekType(p, lexer.TokenDashID) {
+	switch {
+	case tryPeekType(p, lexer.TokenDashID):
 		t = expectTokenType(p, lexer.TokenDashID, "expecting command name")
-	} else {
+	case tryPeekType(p, lexer.TokenDotID):
+		t = expectTokenType(p, lexer.TokenDotID, "expecting command name")
+	case tryPeekType(p, lexer.TokenCommandDefID):
+		t = expectTokenType(p, lexer.TokenCommandDefID, "expecting command name")
+	default:
 		t = expectTokenType(p, lexer.TokenID, "expecting command name")
 	}
 	name := t.Value()
 	line := t.Line()
+	flags := config.CmdFlags(0)
+	// Hidden / Private
+	//
+	if strings.HasPrefix(name, ".") {
+		name = strings.TrimPrefix(name, ".")
+		flags |= config.FlagHidden
+	} else if strings.HasPrefix(name, "!") {
+		name = strings.TrimPrefix(name, "!")
+		flags |= config.FlagPrivate
+	}
 	// Shell
 	//
 	shell := ""

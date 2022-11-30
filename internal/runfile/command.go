@@ -431,8 +431,8 @@ func RunHelp() int {
 	if len(cmdName) > 0 {
 		// Show Hidden?
 		//
-		if strings.HasPrefix(cmdName, "@") {
-			cmdName = strings.TrimPrefix(cmdName, "@")
+		if strings.HasPrefix(cmdName, ".") {
+			cmdName = strings.TrimPrefix(cmdName, ".")
 			cmdShowHidden = true
 		}
 		cmdName = strings.ToLower(cmdName)

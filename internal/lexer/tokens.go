@@ -14,6 +14,7 @@ const (
 	TokenID
 	TokenDotID
 	TokenDashID
+	TokenCommandDefID
 
 	TokenAt          // '@'
 	TokenBang        // '!'

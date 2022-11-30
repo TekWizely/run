@@ -16,7 +16,7 @@ const (
 	// NOTE: You probably want matchNewline()
 	// runeNewline   = '\n'
 	// runeReturn    = '\r'
-	runeAt        = '@'
+	// runeAt        = '@'
 	runeBang      = '!'
 	runeHash      = '#'
 	runeDollar    = '$'
@@ -42,8 +42,8 @@ const (
 // Single-Rune tokens
 //
 var (
-	singleRunes  = []byte{runeAt, runeBang, runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
-	singleTokens = []token.Type{TokenAt, TokenBang, TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
+	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
+	singleTokens = []token.Type{TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
 )
 var mainTokens = map[string]token.Type{
 	"COMMAND": TokenCommand,
@@ -101,6 +101,10 @@ func isAlphaNumUnderDash(r rune) bool {
 
 func isHash(r rune) bool {
 	return r == runeHash
+}
+
+func isDotOrBang(r rune) bool {
+	return r == runeDot || r == runeBang
 }
 
 // isSpaceOrTab matches tab or space

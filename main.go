@@ -370,8 +370,8 @@ func main() {
 			cmdName, os.Args = os.Args[0], os.Args[1:]
 			// Show Hidden?
 			//
-			if strings.HasPrefix(cmdName, "@") {
-				cmdName = strings.TrimPrefix(cmdName, "@")
+			if strings.HasPrefix(cmdName, ".") {
+				cmdName = strings.TrimPrefix(cmdName, ".")
 				cmdShowHidden = true
 			}
 		} else {

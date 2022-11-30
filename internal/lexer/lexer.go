@@ -115,19 +115,24 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 	case matchOneOrMore(l, isSpaceOrTab):
 		l.Clear() // Discard
 	// Newline
+	//
 	case matchNewline(l):
 		l.EmitType(TokenNewline)
 	// DotID
 	//
 	case matchDotID(l):
 		l.EmitToken(TokenDotID)
-	// Keyword / ID / DashID
+	// Keyword / ID / [.!]? DashID
 	//
-	case matchDashID(l):
+	case matchCommandDefID(l):
 		name := strings.ToUpper(l.PeekToken())
 		switch {
 		case isMainToken(name):
 			l.EmitType(mainTokens[name])
+		case strings.HasPrefix(name, "."): // Can only match at front
+			l.EmitToken(TokenCommandDefID)
+		case strings.HasPrefix(name, "!"): // Can only match at front
+			l.EmitToken(TokenCommandDefID)
 		case strings.ContainsRune(name, runeDash):
 			l.EmitToken(TokenDashID)
 		default:
@@ -1012,16 +1017,23 @@ func matchDotID(l *lexer.Lexer) (ok bool) {
 	return false
 }
 
-// matchID
+// matchID matches [a-zA-Z_] [a-zA-Z0-9_]*
 //
 func matchID(l *lexer.Lexer) bool {
 	return matchOne(l, isAlphaUnder) && matchZeroOrMore(l, isAlphaNumUnder)
 }
 
-// matchDashID
+// matchDashID matches [a-zA-Z_] [a-zA-Z0-9_-]*
 //
 func matchDashID(l *lexer.Lexer) bool {
 	return matchOne(l, isAlphaUnder) && matchZeroOrMore(l, isAlphaNumUnderDash)
+}
+
+// matchCommandDefID matches [.!]? DASH_ID
+// Used when defining a command, leading [.!] not needed when referencing it later
+//
+func matchCommandDefID(l *lexer.Lexer) bool {
+	return matchZeroOrOne(l, isDotOrBang) && matchDashID(l)
 }
 
 // matchConfigAttrID matches [a-zA-Z] [a-zA-Z0-9_]* ( \. [a-zA-Z0-9_]+ )*

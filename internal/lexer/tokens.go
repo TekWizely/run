@@ -16,7 +16,7 @@ const (
 	TokenDashID
 	TokenCommandDefID
 
-	TokenAt          // '@'
+	// TokenAt          // '@'
 	TokenBang        // '!'
 	TokenColon       // ':'
 	TokenComma       // ','

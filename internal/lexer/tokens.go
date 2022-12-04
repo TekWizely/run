@@ -14,32 +14,34 @@ const (
 	TokenID
 	TokenDotID
 	TokenDashID
+	TokenCommandDefID
 
-	TokenBang
-	TokenColon
-	TokenComma
+	// TokenAt          // '@'
+	TokenBang        // '!'
+	TokenColon       // ':'
+	TokenComma       // ','
 	TokenEquals      // '=' | ':='
 	TokenQMarkEquals // ?=
 
-	TokenDQuote
+	TokenDQuote // '"'
 	TokenDQStringStart
 
-	TokenSQuote
+	TokenSQuote // "'"
 	TokenSQStringStart
 
 	TokenRunes
 	TokenEscapeSequence
 
-	TokenDollar
+	TokenDollar // '$'
 	TokenVarRefStart
 	TokenSubCmdStart
 
-	TokenLParen
-	TokenRParen
-	TokenLBrace
-	TokenRBrace
-	TokenLBracket
-	TokenRBracket
+	TokenLParen   // '('
+	TokenRParen   // ')'
+	TokenLBrace   // '{'
+	TokenRBrace   // '}'
+	TokenLBracket // '['
+	TokenRBracket // ']'
 
 	TokenParenStringStart  // '( '
 	TokenParenStringEnd    // ' )'

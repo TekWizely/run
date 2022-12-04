@@ -16,6 +16,7 @@ const (
 	// NOTE: You probably want matchNewline()
 	// runeNewline   = '\n'
 	// runeReturn    = '\r'
+	// runeAt        = '@'
 	runeBang      = '!'
 	runeHash      = '#'
 	runeDollar    = '$'
@@ -100,6 +101,10 @@ func isAlphaNumUnderDash(r rune) bool {
 
 func isHash(r rune) bool {
 	return r == runeHash
+}
+
+func isDotOrBang(r rune) bool {
+	return r == runeDot || r == runeBang
 }
 
 // isSpaceOrTab matches tab or space

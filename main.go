@@ -263,6 +263,7 @@ func main() {
 		runCommandsByName := make(map[string]*runfile.RunCmd)
 		for _, cmdProvider := range rf.Cmds {
 			newRunCommand := cmdProvider.GetCmd(rf)
+			newRunCommandFlags := newRunCommand.Flags   // May override later
 			newRunCommandName := newRunCommand.Name     // Un-normalized name used for help
 			name := strings.ToLower(newRunCommand.Name) // normalize
 			// Keep track of which Runfile a command is registered in, to avoid dupes from same file
@@ -294,7 +295,7 @@ func main() {
 						log.Printf("NOTICE: %s:%d command %s overrides command %s defined in %s:%d", newRunCommand.Runfile, newRunCommand.Line, newRunCommand.Name, oldRunCommand.Name, oldRunCommand.Runfile, oldRunCommand.Line)
 					}
 				}
-				// Remove old command, taking note of command name and CommandList index, which will be re-used
+				// Remove old command, taking note of command flags, name and CommandList index, which will be re-used
 				//
 				delete(config.CommandMap, name) // Technically not needed but feels cleaner
 				for i := range config.CommandList {
@@ -303,6 +304,9 @@ func main() {
 						break
 					}
 				}
+				// For flags, first registered command wins
+				//
+				newRunCommandFlags = firstRunCommand.Flags
 				// For help display, first registered command wins
 				//
 				newRunCommandName = firstRunCommand.Name
@@ -317,6 +321,7 @@ func main() {
 			runCommandsByNameForFile[name] = newRunCommand
 			runCommandsByName[name] = newRunCommand
 			cmd := &config.Command{
+				Flags: newRunCommandFlags,
 				Name:  newRunCommandName,
 				Title: newRunCommand.Title(),
 				Help:  func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(newRunCommand),
@@ -345,6 +350,7 @@ func main() {
 	// Determine which command to run
 	//
 	var cmdName string
+	var cmdShowHidden bool
 	if config.MainMode {
 		// In main mode, we defer parsing args to the command
 		//
@@ -362,6 +368,12 @@ func main() {
 		}
 		if len(os.Args) > 0 {
 			cmdName, os.Args = os.Args[0], os.Args[1:]
+			// Show Hidden?
+			//
+			if strings.HasPrefix(cmdName, ".") {
+				cmdName = strings.TrimPrefix(cmdName, ".")
+				cmdShowHidden = true
+			}
 		} else {
 			//
 			// Default (no command) action
@@ -384,11 +396,12 @@ func main() {
 		}
 	}
 	// Run command, if present, else error
+	// Hidden == not present unless command invoked with `@NAME`
 	//
 	cmdName = strings.ToLower(cmdName) // normalize
 	var cmd *config.Command
 	var ok bool
-	if cmd, ok = config.CommandMap[cmdName]; !ok {
+	if cmd, ok = config.CommandMap[cmdName]; !ok || cmd.Flags.Private() || (cmd.Flags.Hidden() && !cmdShowHidden) {
 		log.Printf("command not found: %s", cmdName)
 		runfile.ListCommands()
 		showUsageHint()

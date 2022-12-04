@@ -101,6 +101,9 @@ In run, the entire script is executed within a single sub-shell.
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [RUN / RUN.BEFORE / RUN.AFTER Actions](#run--runbefore--runafter-actions)
    - [.RUN / .RUNFILE Attributes](#run--runfile-attributes)
+ - [Hidden / Private Commands](#hidden--private-commands)
+   - [Hidden Commands](#hidden-commands)
+   - [Private Commands](#private-commands)
  - [Script Shells](#script-shells)
    - [Per-Command Shell Config](#per-command-shell-config)
    - [Global Default Shell Config](#global-default-shell-config)
@@ -1439,6 +1442,88 @@ _output_
 $ run test
 
 Hello, World
+```
+
+-----------------------------
+### Hidden / Private Commands
+
+#### Hidden Commands
+
+You can mark a command as _Hidden_ using a leading `.`:
+
+_hidden command example_
+```
+##
+# Prints 'Hello, Newman', then 'Goodbye, now'
+# RUN hello Newman
+test:
+    echo "Goodbye, now"
+
+## Hello command is hidden
+.hello:
+    echo "Hello, ${1:-world}"
+```
+
+Hidden commands don't show up when listing commands:
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  test       Prints 'Hello, Newman', then 'Goodbye, now'
+```
+
+But they can still be invoked by using their full name, with `.`:
+
+_run hidden command_
+```
+$ run .hello
+
+Hello, world
+```
+
+#### Private Commands
+
+You can mark a command as _Private_ using a leading `!`:
+
+_private command example_
+```
+##
+# Prints 'Hello, Newman', then 'Goodbye, now'
+# RUN hello Newman
+test:
+    echo "Goodbye, now"
+
+## Hello command is private
+!hello:
+    echo "Hello, ${1:-world}"
+```
+
+Private commands don't show up when listing commands:
+
+_list commands_
+```
+$ run list
+
+Commands:
+  ...
+  test       Prints 'Hello, Newman', then 'Goodbye, now'
+```
+
+And they cannot be invoked from outside the Runfile:
+
+_try to run private command_
+```
+$ run hello
+
+run: command not found: hello
+
+$ run '!hello'
+
+run: command not found: !hello
+
 ```
 
 -----------------

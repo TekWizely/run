@@ -2,7 +2,7 @@ package lexer
 
 import "io"
 
-// readerIgnoreCR wraps a RuneReader, filtering errOut '\r'.
+// readerIgnoreCR wraps a RuneReader, filtering out '\r'.
 // Useful for input sources that use '\r'+'\n' for end-of-line.
 //
 type readerIgnoreCR struct {
@@ -19,7 +19,7 @@ func newReaderIgnoreCR(r io.RuneReader) io.RuneReader {
 //
 func (c *readerIgnoreCR) ReadRune() (r rune, size int, err error) {
 	r, size, err = c.r.ReadRune()
-	if size == 1 && r == '\r' {
+	for size == 1 && r == '\r' {
 		r, size, err = c.r.ReadRune()
 	}
 	return

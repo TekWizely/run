@@ -64,6 +64,7 @@ type RunCmdConfig struct {
 // RunCmd captures a command.
 //
 type RunCmd struct {
+	Flags   config.CmdFlags
 	Name    string
 	Config  *RunCmdConfig
 	Scope   *Scope

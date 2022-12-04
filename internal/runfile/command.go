@@ -405,12 +405,14 @@ func ListCommands() {
 	_, _ = fmt.Fprintln(config.ErrOut, "Commands:")
 	padLen := 0
 	for _, cmd := range config.CommandList {
-		if len(cmd.Name) > padLen {
+		if !cmd.Flags.Private() && !cmd.Flags.Hidden() && len(cmd.Name) > padLen {
 			padLen = len(cmd.Name)
 		}
 	}
 	for _, cmd := range config.CommandList {
-		_, _ = fmt.Fprintf(config.ErrOut, "  %s%s    %s\n", cmd.Name, strings.Repeat(" ", padLen-len(cmd.Name)), cmd.Title)
+		if !cmd.Flags.Private() && !cmd.Flags.Hidden() {
+			_, _ = fmt.Fprintf(config.ErrOut, "  %s%s    %s\n", cmd.Name, strings.Repeat(" ", padLen-len(cmd.Name)), cmd.Title)
+		}
 	}
 }
 
@@ -421,13 +423,20 @@ func ListCommands() {
 //
 func RunHelp() int {
 	var cmdName string
+	var cmdShowHidden bool
 	if len(os.Args) > 0 {
 		cmdName = os.Args[0]
 		os.Args = os.Args[1:]
 	}
 	if len(cmdName) > 0 {
+		// Show Hidden?
+		//
+		if strings.HasPrefix(cmdName, ".") {
+			cmdName = strings.TrimPrefix(cmdName, ".")
+			cmdShowHidden = true
+		}
 		cmdName = strings.ToLower(cmdName)
-		if c, ok := config.CommandMap[cmdName]; ok {
+		if c, ok := config.CommandMap[cmdName]; ok && !c.Flags.Private() && (!c.Flags.Hidden() || cmdShowHidden) {
 			c.Help()
 			return 0
 		}

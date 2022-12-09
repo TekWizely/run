@@ -40,7 +40,7 @@ type Command struct {
 	Name    string
 	Title   string
 	Help    func()
-	Run     func([]string, map[string]string) int
+	Run     func([]string, map[string]string, io.Writer) int
 	Rename  func(string) // Rename Command to script Name in 'main' mode
 	Builtin bool
 }
@@ -113,9 +113,13 @@ var CurrentRunfileAbs string
 //
 var CurrentRunfileAbsDir string
 
-// IncludedFiles contains a set of abs file paths to included Runfiles
+// IncludeCycleMap tracks included Runfiles two avoid infinite loops. Key = abs file paths of included Runfile
 //
-var IncludedFiles = map[string]struct{}{}
+var IncludeCycleMap = map[string]struct{}{}
+
+// RunCycleMap tracks inter-cmd RUNs to avoid infinite loops. Key = lowercase name of cmd
+//
+var RunCycleMap = map[string]struct{}{}
 
 // EnableFnTrace shows parser/lexer fn call/stack
 //

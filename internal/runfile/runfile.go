@@ -57,6 +57,7 @@ type RunCmdConfig struct {
 	Desc       []string
 	Usages     []string
 	Opts       []*RunCmdOpt
+	EnvRuns    []*RunCmdRun
 	BeforeRuns []*RunCmdRun
 	AfterRuns  []*RunCmdRun
 }

@@ -254,18 +254,18 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 	for _, filename := range files {
 		// Have we included this file already?
 		//
-		if _, included := config.IncludedFiles[filename]; included {
+		if _, exists := config.IncludeCycleMap[filename]; exists {
 			// Treat as a notice since we safely avoided the (possibly) infinite loop
 			//
 			if config.ShowNotices {
-				log.Printf("NOTICE: runfile already included: '%s'", filename)
+				log.Printf("NOTICE: runfile already included: '%s' - Skipping", filename)
 			}
 		} else {
 			fileBytes, exists, err := util.ReadFileIfExists(filename)
 			if exists {
 				// Mark file included
 				//
-				config.IncludedFiles[filename] = struct{}{}
+				config.IncludeCycleMap[filename] = struct{}{}
 				// Set new prefix so parse errors/line numbers will be relative to the correct file
 				// For brevity, use path relative to config.RunfileAbsDir if possible
 				//
@@ -474,6 +474,11 @@ func (a *Cmd) GetCmdEnv(r *runfile.Runfile, env map[string]string) *runfile.RunC
 	for _, opt := range a.Config.Opts {
 		cmd.Config.Opts = append(cmd.Config.Opts, opt.Apply(cmd))
 	}
+	// Config 'Env' Runs
+	//
+	for _, cmdRun := range a.Config.EnvRuns {
+		cmd.Config.EnvRuns = append(cmd.Config.EnvRuns, cmdRun.Apply(cmd.Scope))
+	}
 	// Config 'Before' Runs
 	//
 	for _, cmdRun := range a.Config.BeforeRuns {
@@ -506,6 +511,7 @@ type CmdConfig struct {
 	VarExports  []*ScopeVarExport
 	AttrExports []*ScopeAttrExport
 	Asserts     []*CmdAssert
+	EnvRuns     []*CmdRun
 	BeforeRuns  []*CmdRun
 	AfterRuns   []*CmdRun
 }

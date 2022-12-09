@@ -89,8 +89,8 @@ func executeScript(shell string, script []string, args []string, env map[string]
 
 // ExecuteCmdScript executes a command script.
 //
-func ExecuteCmdScript(shell string, script []string, args []string, env map[string]string) int {
-	return executeScript(shell, script, args, env, "cmd", os.Stdout)
+func ExecuteCmdScript(shell string, script []string, args []string, env map[string]string, out io.Writer) int {
+	return executeScript(shell, script, args, env, "cmd", out)
 }
 
 // ExecuteSubCommand executes a command substitution.

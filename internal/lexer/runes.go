@@ -73,6 +73,7 @@ var cmdConfigTokens = map[string]token.Type{
 	"RUN":        TokenConfigRunBefore,
 	"RUN.BEFORE": TokenConfigRunBefore,
 	"RUN.AFTER":  TokenConfigRunAfter,
+	"RUN.ENV":    TokenConfigRunEnv,
 }
 
 func isAlpha(r rune) bool {

@@ -3,6 +3,7 @@ package runfile
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/tekwizely/run/internal/config"
 	"github.com/tekwizely/run/internal/exec"
+
+	"github.com/subosito/gotenv"
 )
 
 // NormalizeCmdScript normalizes the command script text.
@@ -454,7 +457,7 @@ func RunHelp() int {
 
 // RunCommand executes a command returning an exit code
 //
-func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[string]string) int {
+func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[string]string, out io.Writer) int {
 	cmd := cmdProvider.GetCmdEnv(rf, env)
 	exitCode := 0
 	args, exitCode = evaluateCmdOpts(cmd, args)
@@ -484,6 +487,50 @@ func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[str
 			cmdEnv[export.VarName] = value
 		} else {
 			log.Printf("WARNING: exported attribute not defined: '%s'", export.AttrName)
+		}
+	}
+	// Run 'Env' Commands - Runs BEFORE Asserts
+	//
+	for _, runCmd := range cmd.Config.EnvRuns {
+		cmdName := strings.ToLower(runCmd.Command) // Normalize
+		var cmdMapEntry *config.Command
+		var cmdExists bool
+		if cmdMapEntry, cmdExists = config.CommandMap[cmdName]; !cmdExists {
+			log.Printf("ERROR: %s:%d: command not found: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		if cmdMapEntry.Builtin {
+			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		if _, exists := config.RunCycleMap[cmdName]; exists {
+			log.Printf("ERROR: %s:%d: Running cmd %s again would cause an infinite loop", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		// Mark command as run
+		//
+		config.RunCycleMap[cmdName] = struct{}{}
+		capturedOutput := &strings.Builder{}
+		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv, capturedOutput)
+		// Clear command from run map
+		//
+		delete(config.RunCycleMap, cmdName)
+		// Exit on error
+		//
+		if exitCode != 0 {
+			return exitCode
+		}
+		// Process ENV response
+		//
+		dotEnv, err := gotenv.StrictParse(strings.NewReader(capturedOutput.String()))
+		if err != nil {
+			log.Printf("ERROR: %s:%d: while processing ENV output from cmd %s: %s", cmd.Runfile, cmd.Line, cmdName, err)
+			return 2
+		}
+		// All values exported
+		//
+		for k, v := range dotEnv {
+			cmdEnv[k] = v
 		}
 	}
 	// Check Asserts - Uses global .SHELL
@@ -519,7 +566,17 @@ func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[str
 			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
 			return 2
 		}
-		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv)
+		if _, exists := config.RunCycleMap[cmdName]; exists {
+			log.Printf("ERROR: %s:%d: Running cmd %s again would cause an infinite loop", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		// Mark command as run
+		//
+		config.RunCycleMap[cmdName] = struct{}{}
+		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv, out)
+		// Clear command from run map
+		//
+		delete(config.RunCycleMap, cmdName)
 		if exitCode != 0 {
 			return exitCode
 		}
@@ -527,7 +584,7 @@ func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[str
 	// Execute script - Uses cmd shell
 	//
 	shell = cmd.Shell()
-	exitCode = exec.ExecuteCmdScript(shell, cmd.Script, args, cmdEnv)
+	exitCode = exec.ExecuteCmdScript(shell, cmd.Script, args, cmdEnv, out)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -545,7 +602,17 @@ func RunCommand(cmdProvider CmdProvider, rf *Runfile, args []string, env map[str
 			log.Printf("ERROR: %s:%d: cannot RUN builtin command: %s", cmd.Runfile, cmd.Line, cmdName)
 			return 2
 		}
-		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv)
+		if _, exists := config.RunCycleMap[cmdName]; exists {
+			log.Printf("ERROR: %s:%d: Running cmd %s again would cause an infinite loop", cmd.Runfile, cmd.Line, cmdName)
+			return 2
+		}
+		// Mark command as run
+		//
+		config.RunCycleMap[cmdName] = struct{}{}
+		exitCode = cmdMapEntry.Run(runCmd.Args, cmdEnv, out)
+		// Clear command from run map
+		//
+		delete(config.RunCycleMap, cmdName)
 		if exitCode != 0 {
 			return exitCode
 		}

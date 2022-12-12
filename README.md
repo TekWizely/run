@@ -99,7 +99,7 @@ In run, the entire script is executed within a single sub-shell.
      - [First Registered Command Defines Default Documentation](#first-registered-command-defines-default-documentation)
      - [Commands Are Listed In The Order They Are Registered](#commands-are-listed-in-the-order-they-are-registered)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
-   - [RUN / RUN.BEFORE / RUN.AFTER Actions](#run--runbefore--runafter-actions)
+   - [RUN / RUN.AFTER / RUN.ENV Actions](#run--runafter--runenv-actions)
    - [.RUN / .RUNFILE Attributes](#run--runfile-attributes)
  - [Hidden / Private Commands](#hidden--private-commands)
    - [Hidden Commands](#hidden-commands)
@@ -1351,7 +1351,7 @@ Notice that `command2` is still shown _between_ `command1` and `command3`, match
 --------------------------------------
 ### Invoking Other Commands & Runfiles
 
-#### RUN / RUN.BEFORE / RUN.AFTER Actions
+#### RUN / RUN.AFTER / RUN.ENV Actions
 
 You can invoke other commands (with arguments) from your Runfile before or after your command executes:
 
@@ -1408,10 +1408,67 @@ Goodbye, now
 *Notes*:
 * `RUN.BEFORE` is also supported, and behaves just like `RUN`
 * Commands are invoked in the order they are defined
-* Your command only runs if all _before_ commands return exit code zero (0)
+* Your command only runs if all previous RUN commands return exit code zero (0)
 * _After_ commands only run if your command returns exit code zero (0)
 * Execution halts if *any* RUN returns a non-zero exit code
 * You cannot invoke _builtin_ commands (help, version, etc)
+
+#### Setting Variables via RUN.ENV
+
+A common occurrence in Runfiles is to have a central command which computes a set of variables, which is then invoked by multiple other commands that need to use those variables:
+
+_eval example_
+```
+##
+# export .RUN, .RUNFILE
+test:
+    eval $( "$RUN" newman )
+    echo "Hello, ${HELLO:-World}"
+
+## Generates script suitable for 'eval' by caller
+newman:
+    echo "HELLO=Newman"
+```
+
+This technique works well, but Run also supports a similar feature using `RUN.ENV`:
+
+_run.env example_
+```
+##
+# RUN.ENV newman
+# ASSERT [ -n "${HELLO}" ] "HELLO not defined"
+test:
+    echo "Hello, ${HELLO:-World}"
+
+## Generates output compatible with simplified .env assignments
+newman:
+    echo "# Let's say hi to Newman"
+    echo "export HELLO=Newman"
+```
+
+_output_
+```
+$ run newman
+
+# Let's say hi to Newman
+export HELLO=Newman
+```
+
+```
+$ run test
+
+Hello, Newman
+```
+
+*Notes*:
+* `RUN.ENV` commands are run **after** EXPORTS
+* `RUN.ENV` commands are run **before** ASSERTS
+* Commands invoked via `RUN.ENV` are expected to generate _relatively_ simple variable assignments
+* Run uses the [subosito/gotenv](https://github.com/subosito/gotenv) library to parse command output
+* `#` comments are supported and will be safely ignored
+* `export` keyword is optional and will be safely ignored
+* Simple variable references in assignments are supported, **but** variables defined _within_ your Runfile are not (currently) accessible - This may be addressed in a future release
+* Visit the [gotenv project page](https://github.com/subosito/gotenv) to learn more about which `.env` features are supported
 
 #### .RUN / .RUNFILE Attributes
 

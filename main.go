@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -193,7 +194,7 @@ func main() {
 	if exists {
 		// Mark primary Runfile as already included (to avoid include loops)
 		//
-		config.IncludedFiles[config.RunfileAbs] = struct{}{}
+		config.IncludeCycleMap[config.RunfileAbs] = struct{}{}
 		// Update IsDefault now that we know about the Runfile
 		//
 		config.RunfileIsDefault = !config.ShebangMode && config.Runfile == runfileDefault
@@ -221,7 +222,7 @@ func main() {
 		Name:    "list",
 		Title:   "(builtin) List available commands",
 		Help:    func() { runfile.ListCommands() },
-		Run:     func(_ []string, _ map[string]string) int { runfile.ListCommands(); return 0 },
+		Run:     func(_ []string, _ map[string]string, _ io.Writer) int { runfile.ListCommands(); return 0 },
 		Rename:  func(_ string) {},
 		Builtin: true,
 	}
@@ -231,7 +232,7 @@ func main() {
 		Name:    "help",
 		Title:   "(builtin) Show help for a command",
 		Help:    showRunHelp,
-		Run:     func(_ []string, _ map[string]string) int { return runfile.RunHelp() },
+		Run:     func(_ []string, _ map[string]string, _ io.Writer) int { return runfile.RunHelp() },
 		Rename:  func(_ string) {},
 		Builtin: true,
 	}
@@ -247,7 +248,7 @@ func main() {
 		Name:    versionName,
 		Title:   "(builtin) Show run version",
 		Help:    func() { showVersion() },
-		Run:     func(_ []string, _ map[string]string) int { showVersion(); return 0 },
+		Run:     func(_ []string, _ map[string]string, _ io.Writer) int { showVersion(); return 0 },
 		Rename:  func(_ string) {},
 		Builtin: true,
 	}
@@ -325,8 +326,10 @@ func main() {
 				Name:  newRunCommandName,
 				Title: newRunCommand.Title(),
 				Help:  func(c *runfile.RunCmd) func() { return func() { runfile.ShowCmdHelp(c) } }(newRunCommand),
-				Run: func(a runfile.CmdProvider) func([]string, map[string]string) int {
-					return func(args []string, env map[string]string) int { return runfile.RunCommand(a, rf, args, env) }
+				Run: func(a runfile.CmdProvider) func([]string, map[string]string, io.Writer) int {
+					return func(args []string, env map[string]string, out io.Writer) int {
+						return runfile.RunCommand(a, rf, args, env, out)
+					}
 				}(cmdProvider),
 				Rename:  func(c *runfile.RunCmd) func(string) { return func(s string) { c.Name = s } }(newRunCommand),
 				Builtin: false,
@@ -408,7 +411,10 @@ func main() {
 		exitCode = 2
 		return
 	}
-	exitCode = cmd.Run(os.Args, map[string]string{})
+	// Mark primary command as being run (to void RUN loops)
+	//
+	config.RunCycleMap[cmdName] = struct{}{}
+	exitCode = cmd.Run(os.Args, map[string]string{}, os.Stdout)
 }
 
 func parseArgs() int {

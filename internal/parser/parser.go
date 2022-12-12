@@ -436,7 +436,7 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 				cmdConfig.Asserts = append(cmdConfig.Asserts, assert)
 				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 				p.Clear()
-			case lexer.TokenConfigRunBefore, lexer.TokenConfigRunAfter:
+			case lexer.TokenConfigRunEnv, lexer.TokenConfigRunBefore, lexer.TokenConfigRunAfter:
 				t = p.Next()
 				ctx.pushLexFn(ctx.l.Fn)
 				ctx.setLexFn(lexer.LexExpectCommandName)
@@ -452,10 +452,17 @@ func tryMatchDocBlock(ctx *parseContext, p *parser.Parser) (*ast.CmdConfig, bool
 					}
 				}
 				cmdRun := &ast.CmdRun{Command: command, Args: args}
-				if t.Type() == lexer.TokenConfigRunBefore {
+				switch t.Type() {
+				case lexer.TokenConfigRunEnv:
+					cmdConfig.EnvRuns = append(cmdConfig.EnvRuns, cmdRun)
+				case lexer.TokenConfigRunBefore:
 					cmdConfig.BeforeRuns = append(cmdConfig.BeforeRuns, cmdRun)
-				} else {
+				case lexer.TokenConfigRunAfter:
 					cmdConfig.AfterRuns = append(cmdConfig.AfterRuns, cmdRun)
+				default:
+					// NOTE: Unreachable unless we add a token and forget to implement it
+					//
+					panic(fmt.Sprintf("%d:%d: Unknown cmd config RUN token: %d", t.Line(), t.Column(), t.Type()))
 				}
 				expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 				p.Clear()

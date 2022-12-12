@@ -74,6 +74,7 @@ const (
 	TokenConfigAssert
 	TokenConfigRunBefore
 	TokenConfigRunAfter
+	TokenConfigRunEnv
 
 	TokenConfigEnd
 

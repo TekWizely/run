@@ -191,8 +191,31 @@ func parseMain(ctx *parseContext, p *parser.Parser) parseFn {
 	if tryPeekType(p, lexer.TokenInclude) {
 		p.Next()
 		ctx.pushLexFn(ctx.l.Fn)
+		ctx.setLexFn(lexer.LexMaybeBangOrQMark)
+		t := p.Next()
+		var (
+			missingSingleOk   = t.Type() == lexer.TokenQMark
+			missingMatchersOk = t.Type() != lexer.TokenBang
+		)
 		valueList = expectAssignmentValue(ctx, p)
-		ctx.ast.Add(&ast.ScopeInclude{FilePattern: valueList})
+		ctx.ast.Add(&ast.ScopeInclude{FilePattern: valueList, MissingSingleOk: missingSingleOk, MissingMatchersOk: missingMatchersOk})
+		expectTokenType(p, lexer.TokenNewline, "expecting end of line")
+		p.Clear()
+		return parseMain
+	}
+	// Include.Env
+	//
+	if tryPeekType(p, lexer.TokenIncludeEnv) {
+		p.Next()
+		ctx.pushLexFn(ctx.l.Fn)
+		ctx.setLexFn(lexer.LexMaybeBangOrQMark)
+		t := p.Next()
+		var (
+			missingSingleOk   = t.Type() != lexer.TokenBang
+			missingMatchersOk = t.Type() != lexer.TokenBang
+		)
+		valueList = expectAssignmentValue(ctx, p)
+		ctx.ast.Add(&ast.ScopeIncludeEnv{FilePattern: valueList, MissingSingleOk: missingSingleOk, MissingMatchersOk: missingMatchersOk})
 		expectTokenType(p, lexer.TokenNewline, "expecting end of line")
 		p.Clear()
 		return parseMain

@@ -20,6 +20,7 @@ const (
 	TokenBang        // '!'
 	TokenColon       // ':'
 	TokenComma       // ','
+	TokenQMark       // '?'
 	TokenEquals      // '=' | ':='
 	TokenQMarkEquals // ?=
 
@@ -57,6 +58,7 @@ const (
 	TokenAs
 	TokenAssert
 	TokenInclude
+	TokenIncludeEnv
 	TokenCommand
 
 	TokenHashLine

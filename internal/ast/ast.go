@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/goreleaser/fileglob"
+	"github.com/subosito/gotenv"
 	"github.com/tekwizely/run/internal/config"
 	"github.com/tekwizely/run/internal/exec"
 	"github.com/tekwizely/run/internal/runfile"
@@ -202,7 +204,9 @@ func (a *ScopeAssert) Apply(s *runfile.Scope) {
 // ScopeInclude includes other runfiles.
 //
 type ScopeInclude struct {
-	FilePattern ScopeValueNode
+	FilePattern       ScopeValueNode
+	MissingSingleOk   bool
+	MissingMatchersOk bool
 }
 
 // Apply applies the node to the scope.
@@ -226,10 +230,16 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 	if fileglob.ContainsMatchers(filePattern) {
 		if files, err = fileglob.Glob(filePattern, fileglob.MaybeRootFS); err != nil {
 			panic(fmt.Errorf("processing include pattern '%s': %s", filePattern, err))
-			// OK for fileglob to result in 0 files, but notify user
-			//
-		} else if config.ShowNotices && len(files) == 0 {
-			log.Printf("NOTICE: include pattern resulted in no matches: %s", filePattern)
+		} else if len(files) == 0 {
+			if a.MissingMatchersOk {
+				// OK for fileglob to result in 0 files, but notify user
+				//
+				if config.ShowNotices {
+					log.Printf("NOTICE: include pattern resulted in no matches: %s", filePattern)
+				}
+			} else {
+				panic(fmt.Errorf("include pattern resulted in no matches: %s", filePattern))
+			}
 		}
 	} else {
 		// Specific (not-glob) filename expected to exist - Checked in loop below
@@ -290,9 +300,16 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 				//
 				// We're about to panic, assume prior defer will restore values before exiting
 				//
-
 				if err == nil {
-					panic(fmt.Errorf("include runfile not found: '%s'", filename))
+					if a.MissingSingleOk {
+						// OK if file missing, but notify user
+						//
+						if config.ShowNotices {
+							log.Printf("NOTICE: include runfile not found: '%s'", filename)
+						}
+					} else {
+						panic(fmt.Errorf("include runfile not found: '%s'", filename))
+					}
 				} else {
 					// If path error, just show the wrapped error
 					//
@@ -300,6 +317,102 @@ func (a *ScopeInclude) Apply(r *runfile.Runfile) {
 						err = pathErr.Unwrap()
 					}
 					panic(fmt.Errorf("include runfile '%s': %s", filename, err.Error()))
+				}
+			}
+		}
+	}
+}
+
+// ScopeIncludeEnv includes .env files.
+//
+type ScopeIncludeEnv struct {
+	FilePattern       ScopeValueNode
+	MissingSingleOk   bool
+	MissingMatchersOk bool
+}
+
+// Apply applies the node to the scope.
+//
+func (a *ScopeIncludeEnv) Apply(r *runfile.Runfile) {
+	filePattern := a.FilePattern.Apply(r.Scope)
+	// We want the absolute file paths for include tracking
+	// If pattern is not absolute, assume its relative to config.RunfileAbsDir
+	//
+	if !filepath.IsAbs(filePattern) {
+		filePattern = filepath.Join(config.RunfileAbsDir, filePattern)
+	}
+	// Skip fileglob if pattern does not look like a glob.
+	// By checking this ourselves, we hope to gain more control over error reporting,
+	// as fileglob currently (as of v1.3.0) conceals the fs.ErrorNotExist condition.
+	//
+	var files []string
+	if fileglob.ContainsMatchers(filePattern) {
+		var err error
+		if files, err = fileglob.Glob(filePattern, fileglob.MaybeRootFS); err != nil {
+			panic(fmt.Errorf("processing include.env pattern '%s': %s", filePattern, err))
+		} else if len(files) == 0 {
+			if a.MissingMatchersOk {
+				// OK for fileglob to result in 0 files, but notify user
+				//
+				if config.ShowNotices {
+					log.Printf("NOTICE: include.env pattern resulted in no matches: %s", filePattern)
+				}
+			} else {
+				panic(fmt.Errorf("include.env pattern resulted in no matches: %s", filePattern))
+			}
+		}
+	} else {
+		// Specific (not-glob) filename expected to exist - Checked in loop below
+		//
+		files = []string{filePattern}
+	}
+	// NOTE: filenames assumed to be absolute
+	// TODO Sort list (path aware) ?
+	//
+	for _, filename := range files {
+		// Have we included this file already?
+		//
+		if _, exists := config.IncludeEnvCycleMap[filename]; exists {
+			// Treat as a notice since we safely avoided the (possibly) infinite loop
+			//
+			if config.ShowNotices {
+				log.Printf("NOTICE: env file already included: '%s' - Skipping", filename)
+			}
+		} else {
+			fileBytes, exists, err := util.ReadFileIfExists(filename)
+			if exists {
+				// Mark file included
+				//
+				config.IncludeEnvCycleMap[filename] = struct{}{}
+				// Parse the file
+				//
+				dotEnv, err := gotenv.StrictParse(bytes.NewReader(fileBytes))
+				if err != nil {
+					panic(fmt.Errorf("include.env file '%s': %s", filename, err.Error()))
+				}
+				// No values exported by default
+				//
+				for k, v := range dotEnv {
+					r.Scope.PutVar(k, v)
+				}
+			} else {
+				if err == nil {
+					if a.MissingSingleOk {
+						// OK if file missing, but notify user
+						//
+						if config.ShowNotices {
+							log.Printf("NOTICE: include.env file not found: '%s'", filename)
+						}
+					} else {
+						panic(fmt.Errorf("include.env file not found: '%s'", filename))
+					}
+				} else {
+					// If path error, just show the wrapped error
+					//
+					if pathErr, ok := err.(*os.PathError); ok {
+						err = pathErr.Unwrap()
+					}
+					panic(fmt.Errorf("include.env file '%s': %s", filename, err.Error()))
 				}
 			}
 		}

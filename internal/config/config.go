@@ -113,9 +113,13 @@ var CurrentRunfileAbs string
 //
 var CurrentRunfileAbsDir string
 
-// IncludeCycleMap tracks included Runfiles two avoid infinite loops. Key = abs file paths of included Runfile
+// IncludeCycleMap tracks included Runfiles to avoid infinite loops. Key = abs file paths of included Runfile
 //
 var IncludeCycleMap = map[string]struct{}{}
+
+// IncludeEnvCycleMap tracks included .env files to avoid infinite loops. Key = abs file paths of included .env file
+//
+var IncludeEnvCycleMap = map[string]struct{}{}
 
 // RunCycleMap tracks inter-cmd RUNs to avoid infinite loops. Key = lowercase name of cmd
 //

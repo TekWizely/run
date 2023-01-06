@@ -122,6 +122,22 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 	//
 	case matchDotID(l):
 		l.EmitToken(TokenDotID)
+	// Keyword / ID / DashID
+	//
+	case matchConfigAttrID(l):
+		name := strings.ToUpper(l.PeekToken())
+		switch {
+		case isMainToken(name):
+			l.EmitType(mainTokens[name])
+		// Only main tokens can contain '.'
+		//
+		case strings.ContainsRune(name, runeDot):
+			l.EmitToken(TokenUnknownRune)
+		case strings.ContainsRune(name, runeDash):
+			l.EmitToken(TokenDashID)
+		default:
+			l.EmitToken(TokenID)
+		}
 	// Keyword / ID / [.!]? DashID
 	//
 	case matchCommandDefID(l):
@@ -874,6 +890,21 @@ func LexMaybeNewline(_ *LexContext, l *lexer.Lexer) LexFn {
 		l.EmitType(TokenNewline)
 	} else {
 		l.EmitType(TokenNotNewline)
+	}
+	return nil
+}
+
+// LexMaybeBangOrQMark eats current whitespace, then emits either TokenBang, TokenMark, or TokenUnknownRune
+//
+func LexMaybeBangOrQMark(_ *LexContext, l *lexer.Lexer) LexFn {
+	ignoreSpace(l)
+	switch {
+	case matchOne(l, isBang):
+		l.EmitType(TokenBang)
+	case matchOne(l, isQMark):
+		l.EmitType(TokenQMark)
+	default:
+		l.EmitType(TokenUnknownRune)
 	}
 	return nil
 }

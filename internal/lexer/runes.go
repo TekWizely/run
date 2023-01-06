@@ -42,15 +42,16 @@ const (
 // Single-Rune tokens
 //
 var (
-	singleRunes  = []byte{runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
-	singleTokens = []token.Type{TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
+	singleRunes  = []byte{runeQMark, runeColon, runeEquals, runeLParen, runeRParen, runeLBrace, runeRBrace, runeLBracket, runeRBracket}
+	singleTokens = []token.Type{TokenQMark, TokenColon, TokenEquals, TokenLParen, TokenRParen, TokenLBrace, TokenRBrace, TokenLBracket, TokenRBracket}
 )
 var mainTokens = map[string]token.Type{
-	"COMMAND": TokenCommand,
-	"CMD":     TokenCommand,
-	"EXPORT":  TokenExport,
-	"ASSERT":  TokenAssert,
-	"INCLUDE": TokenInclude,
+	"COMMAND":     TokenCommand,
+	"CMD":         TokenCommand,
+	"EXPORT":      TokenExport,
+	"ASSERT":      TokenAssert,
+	"INCLUDE":     TokenInclude,
+	"INCLUDE.ENV": TokenIncludeEnv,
 }
 
 // isMainToken isolates the lookup+check-ok logic.
@@ -102,6 +103,14 @@ func isAlphaNumUnderDash(r rune) bool {
 
 func isHash(r rune) bool {
 	return r == runeHash
+}
+
+func isQMark(r rune) bool {
+	return r == runeQMark
+}
+
+func isBang(r rune) bool {
+	return r == runeBang
 }
 
 func isDotOrBang(r rune) bool {

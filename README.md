@@ -56,7 +56,7 @@ In run, the entire script is executed within a single sub-shell.
  - [Command-Line Options](#command-line-options)
    - [Making Options Required](#making-options-required)
    - [Providing A Default Option Value](#providing-a-default-option-value)
-   - [Boolean (Flag) Options](#boolean-flag-options)
+   - [Boolean (Flag) Options](#boolean--flag--options)
    - [Getting `-h` & `--help` For Free](#getting--h----help-for-free)
    - [Passing Options Directly Through to the Command Script](#passing-options-directly-through-to-the-command-script)
  - [Run Tool Help](#run-tool-help)
@@ -65,7 +65,7 @@ In run, the entire script is executed within a single sub-shell.
    - [Via Environment Variables](#via-environment-variables)
      - [`$RUNFILE`](#runfile-1)
        - [Using Direnv](#using-direnv-to-auto-configure-runfile)
-     - [`$RUNFILE_ROOTS`](#runfile_roots)
+     - [`$RUNFILE_ROOTS`](#runfileroots)
  - [Runfile Variables](#runfile-variables)
    - [Local By Default](#local-by-default)
    - [Exporting Variables](#exporting-variables)
@@ -87,10 +87,10 @@ In run, the entire script is executed within a single sub-shell.
      - [Simple Export](#simple-export)
      - [Export With Name](#export-with-name)
  - [Assertions](#assertions)
- - [Includes](#includes)
+ - [Includes](#includes---runfiles)
    - [File Globbing](#file-globbing)
    - [Working Directory](#working-directory)
-   - [File(s) Not Found](#files-not-found)
+   - [Required vs Optional](#file--s--not-found)
    - [Avoiding Include Loops](#avoiding-include-loops)
    - [Overriding Commands](#overriding-commands)
      - [Cannot Re-Register Command In Same Runfile](#cannot-re-register-command-in-same-runfile)
@@ -98,6 +98,8 @@ In run, the entire script is executed within a single sub-shell.
      - [First Registered Command Defines Case For Help](#first-registered-command-defines-case-for-help)
      - [First Registered Command Defines Default Documentation](#first-registered-command-defines-default-documentation)
      - [Commands Are Listed In The Order They Are Registered](#commands-are-listed-in-the-order-they-are-registered)
+ - [Includes - .ENV](#includes---env)
+   - [Required vs Optional](#file--s--not-found-1)
  - [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles)
    - [RUN / RUN.AFTER / RUN.ENV Actions](#run--runafter--runenv-actions)
    - [.RUN / .RUNFILE Attributes](#run--runfile-attributes)
@@ -884,15 +886,14 @@ Their names start with `.` to avoid colliding with [runfile variables](#runfile-
 
 Following is the list of Run's attributes:
 
-| Attribute      | Description
-|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------
-| `.SHELL`       | Contains the shell command that will be used to execute command scripts. See [Script Shells](#script-shells) for more details.
-| `.RUN`         | Contains the absolute path of the run binary currently in use. Useful for [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles).
-| `.RUNFILE`     | Contains the absolute path of the **primary** Runfile.
-| `.RUNFILE.DIR` | Contains the absolute path of the parent folder of the **primary** runfile.
-| `.SELF`        | Contains the absolute path of the **current** (primary or included) runfile.
-| `.SELF.DIR`    | Contains the absolute path of the parent folder of the **current** runfile.
-
+| Attribute      | Description                                                                                                                                         |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.SHELL`       | Contains the shell command that will be used to execute command scripts. See [Script Shells](#script-shells) for more details.                      |
+| `.RUN`         | Contains the absolute path of the run binary currently in use. Useful for [Invoking Other Commands & Runfiles](#invoking-other-commands--runfiles). |
+| `.RUNFILE`     | Contains the absolute path of the **primary** Runfile.                                                                                              |
+| `.RUNFILE.DIR` | Contains the absolute path of the parent folder of the **primary** runfile.                                                                         |
+| `.SELF`        | Contains the absolute path of the **current** (primary or included) runfile.                                                                        |
+| `.SELF.DIR`    | Contains the absolute path of the parent folder of the **current** runfile.                                                                         |
 
 #### Exporting Attributes
 
@@ -1039,12 +1040,12 @@ Hello, Everybody
 
 *Note:* Assertions apply only to commands and are only checked when a command is invoked.  Any globally-defined assertions will apply to ALL commands defined after the assertion.
 
-------------
-### Includes
+-----------------------
+### Includes - Runfiles
 
-Includes let you organize commands across multiple Runfiles.
+Includes let you organize and configure commands across multiple Runfiles.
 
-Includes have the following syntax:
+You can include other Runfiles using the following syntax:
 ```
 INCLUDE <file pattern> | "<file pattern>" | '<file pattern>'
 ```
@@ -1110,19 +1111,27 @@ Include names / glob-patterns are resolved relative to the Primary runfile's con
 
 #### File(s) Not Found
 
-##### OK For Glob
+##### Default: OK For Glob
 
 When using a globbing pattern, Run considers it OK if the pattern results in no files being found.
 
 This makes it possible to support features like an optional Runfile include directory, or the ability to start a project folder with no includes but have them automatically picked up as you add them.
 
 _Runfile_
-
 ```
-INCLUDE maybe_some_runfiles/Runfile-*  # OK if not no files found
+INCLUDE maybe_some_runfiles/Runfile-*  # OK if no files found
 ```
 
-##### BAD For Single File
+##### Force Error If No Files Found
+
+To force an error if no files are found when using a globbing pattern, use `!` :
+
+_Runfile_
+```
+INCLUDE ! maybe_some_runfiles/Runfile-*  # ERROR if no files found
+```
+
+##### Default: BAD For Single File
 
 When using a single filename (no globbing), Run considers it an error if the include file is not found.
 
@@ -1136,6 +1145,15 @@ _output_
 $ run list
 
 run: include runfile not found: 'Runfile-must-exist'
+```
+
+##### Skip Error If File Not Found
+
+To skip generating an error if no file is found when using a single filename, use `?` :
+
+_Runfile_
+```
+INCLUDE ? Runfile-might-exist  # OK if file not found
 ```
 
 #### Avoiding Include Loops
@@ -1347,6 +1365,60 @@ Commands:
 ```
 
 Notice that `command2` is still shown _between_ `command1` and `command3`, matching the order in which it was originally registered.
+
+-------------------
+### Includes - .ENV
+
+`.env` files allow users to manage runfile configuration without modifying the Runfile directly.
+
+Your Runfile can include .env files using the following syntax:
+```
+INCLUDE.ENV <file pattern> | "<file pattern>" | '<file pattern>'
+```
+
+Simple example:
+
+_Runfile.env_
+```
+HELLO=Newman
+```
+
+_Runfile_
+```
+INCLUDE.ENV Runfile.env
+
+##
+# export HELLO
+hello:
+    echo "Hello, ${HELLO:-World}"
+```
+
+_output_
+```
+$ run hello
+
+Hello, Newman
+```
+
+*Notes:*
+* Variables are immediately available, as if they had been defined in the same place in the Runfile.
+* Variables are not automatically exported.
+* Run uses the [subosito/gotenv](https://github.com/subosito/gotenv) library to parse command output
+* `#` comments are supported and will be safely ignored
+* `export` keyword is optional and is (currently) ignored - This may be addressed in a future release
+* Simple variable references in assignments are supported, **but** variables defined _within_ your Runfile are not (currently) accessible - This may be addressed in a future release
+* Visit the [gotenv project page](https://github.com/subosito/gotenv) to learn more about which `.env` features are supported
+
+#### File(s) Not Found
+
+By default, Run considers it OK no .env file is found (using either a single filename or a globbing pattern).
+
+To force an error if no file(s) are found, use `!`:
+
+_Runfile_
+```
+INCLUDE.ENV ! Runfile-might-not-exist.env # ERROR if no file(s) found
+```
 
 --------------------------------------
 ### Invoking Other Commands & Runfiles

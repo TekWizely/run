@@ -16,8 +16,8 @@ github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSS
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.5 h1:s5PTfem8p8EbKQOctVV53k6jCJt3UX4IEJzwh+C324Q=
 github.com/stretchr/testify v1.7.5/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-github.com/subosito/gotenv v1.4.1 h1:jyEFiXpy21Wm81FBN71l9VoMMV8H8jG+qIK3GCpY6Qs=
-github.com/subosito/gotenv v1.4.1/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
+github.com/subosito/gotenv v1.4.2 h1:X1TuBLAMDFbaTAChgCBLu3DU3UPyELpnF2jjJ2cz/S8=
+github.com/subosito/gotenv v1.4.2/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
 github.com/tekwizely/go-parsing/lexer v0.0.0-20190714043513-9514494dd58a/go.mod h1:M1+qLv1DBvWnJVqjBkbGN49/c78ZrS6Js2ZJ3J6gEnA=
 github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15 h1:All3gqlRswSCOaeaQb8p7wMxdoK8w+z5T7CjWyiKq7o=
 github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15/go.mod h1:M1+qLv1DBvWnJVqjBkbGN49/c78ZrS6Js2ZJ3J6gEnA=

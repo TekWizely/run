@@ -10,7 +10,7 @@ go 1.13
 //
 require (
 	github.com/goreleaser/fileglob v1.3.0
-	github.com/subosito/gotenv v1.4.1
+	github.com/subosito/gotenv v1.4.2
 	github.com/tekwizely/go-parsing/lexer v0.0.0-20210910181107-ed69a13f4d15
 	github.com/tekwizely/go-parsing/lexer/token v0.0.0-20210910181107-ed69a13f4d15
 	github.com/tekwizely/go-parsing/parser v0.0.0-20210910181107-ed69a13f4d15

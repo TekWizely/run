@@ -653,7 +653,7 @@ You do this using the `$RUNFILE_ROOTS` path variable.
 
 * `$RUNFILE_ROOTS` is treated as a list of path entries (using standard os path separator)
 * Behaves largely similar to [GIT_CEILING_DIRECTORIES](https://git-scm.com/docs/git#Documentation/git.txt-codeGITCEILINGDIRECTORIEScode)
-* If `$PWD` is a child of a root entry, run walks-up looking for `Runfile`
+* If `$PWD` is a child of a root entry, then run will walk up the folder hierarchy, checking each folder for the currently-configured Runfile.
 * Roots themselves are generally treated as _exclusive_ (ie not checked)
 * `$HOME`, if a configured root, is treated as _inclusive_ (ie it **is** checked)
 
@@ -665,7 +665,7 @@ _most permissive_
 
     export RUNFILE_ROOTS="/"  # Will walk up to / (exclusively)
 
-NOTE: `$HOME` is given special treatment to support the case where a project is given its own _user_ account and lives in the _home_ folder of that user.
+NOTE: `$HOME` is given special treatment to support the case where a project is given its own _user_ account and the Runfile lives in the _home_ folder of that user.
 
 For the case of creating globally available tasks, see the [Special Modes](#special-modes) section.
 

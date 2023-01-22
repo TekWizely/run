@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -159,13 +158,7 @@ func main() {
 		if exitCode != 0 {
 			return
 		}
-		// No fallback logic when user specifies file, even if its "Runfile"
-		//
-		if len(config.Runfile) > 0 {
-			_, exists, err = util.StatIfExists(config.Runfile)
-		} else {
-			config.Runfile, _, exists, err = tryFindRunfile()
-		}
+		config.Runfile, _, exists, err = tryFindRunfile()
 	}
 	var rf *runfile.Runfile
 	var bytes []byte
@@ -204,6 +197,8 @@ func main() {
 		rf = ast.ProcessAST(rfAst)
 		config.RunfileIsLoaded = true
 	} else {
+		// NOTE: No error codes here - Allow built-in commands to be run even if runfile not found
+		//
 		if err == nil {
 			log.Printf("ERROR: runfile '%s' not found: please create the file or specify an alternative\n\n", util.DefaultIfEmpty(config.Runfile, runfileDefault)) // 2 x \n
 		} else {
@@ -405,9 +400,13 @@ func main() {
 	var cmd *config.Command
 	var ok bool
 	if cmd, ok = config.CommandMap[cmdName]; !ok || cmd.Flags.Private() || (cmd.Flags.Hidden() && !cmdShowHidden) {
-		log.Printf("command not found: %s", cmdName)
-		runfile.ListCommands()
-		showUsageHint()
+		// TODO HACK : If we get here via Runfile not found, don't display cmd error
+		//
+		if rf != nil {
+			log.Printf("command not found: %s", cmdName)
+			runfile.ListCommands()
+			showUsageHint()
+		}
 		exitCode = 2
 		return
 	}
@@ -454,19 +453,34 @@ func parseArgs() int {
 
 // tryFindRunfile attempts to locate a Runfile
 //
-// * Checks ${PWD}/Runfile
-// * Checks $RUNFILE_ROOTS
-//   - Behaves largely similar to GIT_CEILING_DIRECTORIES
-//   - if $PWD is under any entry, then walks up looking for 'Runfile'
-//   - Stops walking up at specified root value
-//   - Does not check root folder itself
-//   - Except for $HOME, which will be checked if present on $RUNFILE_ROOTS
+// Let <RUNFILE> be the resolved Runfile name, resulting from:
+//   * Value specified in [ -r | --runfile ] flag
+//   * Value specified in $RUNFILE environment variable
+//   * Default value of 'Runfile'
 //
-func tryFindRunfile() (inputFile string, stat os.FileInfo, exists bool, err error) {
-	// Look for default Runfile
+// Does the following:
+//   * Checks for <RUNFILE> relative to current $PWD
+//   * If <RUNFILE> is a relative path, also Checks against $RUNFILE_ROOTS
+//     - Behaves largely similar to GIT_CEILING_DIRECTORIES
+//     - if $PWD is under any entry, then walks up looking for <RUNFILE> relative to each folder
+//     - Stops walking up at specified root value
+//     - Does not check root folder itself
+//     - Except for $HOME, which will be checked if present on $RUNFILE_ROOTS
+//
+func tryFindRunfile() (string, os.FileInfo, bool, error) {
+	var (
+		stat   os.FileInfo
+		exists bool
+		err    error
+	)
+	// Set to configured or default
 	//
-	if stat, exists, err = util.StatIfExists(runfileDefault); exists {
-		return runfileDefault, stat, exists, err
+	runfilePath := util.DefaultIfEmpty(config.Runfile, runfileDefault)
+	// Look for match relative to current WD
+	// If file found or if it is an absolute path, then we're done
+	//
+	if stat, exists, err = util.StatIfExists(runfilePath); exists || filepath.IsAbs(runfilePath) {
+		return runfilePath, stat, exists, err
 	}
 	// Look for root to possibly walk-up
 	//
@@ -475,17 +489,17 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, exists bool, err erro
 		//
 		var wd string
 		if wd, err = os.Getwd(); err != nil {
-			return "", nil, false, err
+			return runfilePath, nil, false, err
 		}
 		wd = path.Clean(wd)
 		if !filepath.IsAbs(wd) {
-			return "", nil, false, fmt.Errorf("working directory is not absolute: %v", wd)
+			return runfilePath, nil, false, fmt.Errorf("working directory is not absolute: %v", wd)
 		}
 		// If we're already at the root, no need to look further
 		//
 		var wdDir string
 		if wdDir = filepath.Dir(wd); wdDir == wd {
-			return "", nil, false, errors.New("'Runfile' not found. please create file or specify an alternative")
+			return runfilePath, nil, false, nil // Caller will generate error msg
 		}
 		// $HOME gets special treatment as an INCLUSIVE root
 		//
@@ -520,23 +534,23 @@ func tryFindRunfile() (inputFile string, stat os.FileInfo, exists bool, err erro
 			//
 			var rel string
 			for rel, err = filepath.Rel(root, wd); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, "."); rel, err = filepath.Rel(root, wd) {
-				inputFile = filepath.Join(wd, runfileDefault)
-				if stat, exists, err = util.StatIfExists(inputFile); exists {
-					return
+				statFile := filepath.Join(wd, runfilePath)
+				if stat, exists, err = util.StatIfExists(runfilePath); exists {
+					return statFile, stat, exists, err
 				}
 				wd = path.Dir(wd)
 			}
 			// root exclusion exemption for $HOME
 			//
 			if root == home && err == nil && rel == "." {
-				inputFile = filepath.Join(wd, runfileDefault)
-				if stat, exists, err = util.StatIfExists(inputFile); exists {
-					return
+				statFile := filepath.Join(wd, runfilePath)
+				if stat, exists, err = util.StatIfExists(runfilePath); exists {
+					return statFile, stat, exists, err
 				}
 			}
 		}
 	}
 	// Nothing else to try, sorry dude
 	//
-	return "", nil, false, errors.New("'Runfile' not found. please create file or specify an alternative")
+	return runfilePath, nil, false, nil // Caller will generate error msg
 }

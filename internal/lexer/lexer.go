@@ -118,13 +118,13 @@ func LexMain(_ *LexContext, l *lexer.Lexer) LexFn {
 	//
 	case matchNewline(l):
 		l.EmitType(TokenNewline)
-	// DotID
+	// DotID - Starts with .
 	//
 	case matchDotID(l):
 		l.EmitToken(TokenDotID)
 	// Keyword / ID / DashID
 	//
-	case matchConfigAttrID(l):
+	case matchAnyID(l):
 		name := strings.ToUpper(l.PeekToken())
 		switch {
 		case isMainToken(name):
@@ -1082,6 +1082,29 @@ func matchConfigAttrID(l *lexer.Lexer) (ok bool) {
 		matchZeroOrMore(l, isAlphaNum)
 		for matchRune(l, runeDot) {
 			if !matchOneOrMore(l, isAlphaNum) {
+				return ok
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// matchAnyID matches [a-zA-Z] [a-zA-Z0-9_-]* ( \. [a-zA-Z0-9_-]+ )*
+//
+func matchAnyID(l *lexer.Lexer) (ok bool) {
+	m := l.Marker()
+	// If we don't match then reset
+	//
+	defer func() {
+		if !ok {
+			m.Apply()
+		}
+	}()
+	if matchOne(l, isAlpha) {
+		matchZeroOrMore(l, isAlphaNumUnderDash)
+		for matchRune(l, runeDot) {
+			if !matchOneOrMore(l, isAlphaNumUnderDash) {
 				return ok
 			}
 		}

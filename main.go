@@ -535,7 +535,7 @@ func tryFindRunfile() (string, os.FileInfo, bool, error) {
 			var rel string
 			for rel, err = filepath.Rel(root, wd); err == nil && len(rel) > 0 && !strings.HasPrefix(rel, "."); rel, err = filepath.Rel(root, wd) {
 				statFile := filepath.Join(wd, runfilePath)
-				if stat, exists, err = util.StatIfExists(runfilePath); exists {
+				if stat, exists, err = util.StatIfExists(statFile); exists {
 					return statFile, stat, exists, err
 				}
 				wd = path.Dir(wd)
@@ -544,7 +544,7 @@ func tryFindRunfile() (string, os.FileInfo, bool, error) {
 			//
 			if root == home && err == nil && rel == "." {
 				statFile := filepath.Join(wd, runfilePath)
-				if stat, exists, err = util.StatIfExists(runfilePath); exists {
+				if stat, exists, err = util.StatIfExists(statFile); exists {
 					return statFile, stat, exists, err
 				}
 			}

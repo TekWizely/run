@@ -1,6 +1,6 @@
 {
   "name": "@tekwizely/run",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Easily manage and invoke small scripts and wrappers",
   "homepage": "https://github.com/TekWizely/run",
   "license": "MIT",

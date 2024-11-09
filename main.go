@@ -63,7 +63,7 @@ func showRunHelp() {
 	fmt.Fprintln(config.ErrOut, "        -f | -f=true | -f=false")
 	fmt.Fprintln(config.ErrOut, "  Short options cannot be combined")
 	if !config.ShebangMode {
-		fmt.Fprintln(config.ErrOut, "\nLearn more about run at https://github.com/TekWizely/run") // Leading \n
+		fmt.Fprintln(config.ErrOut, "\nLearn more about run (including example runfiles) at https://github.com/TekWizely/run") // Leading \n
 	}
 }
 

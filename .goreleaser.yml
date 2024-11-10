@@ -4,8 +4,9 @@
 #
 # Usage:
 #
-#  goreleaser --rm-dist --skip-publish [--snapshot]
+#  goreleaser release --clean --skip=publish [--snapshot]
 #
+version: 2
 project_name: run
 env:
   - GO111MODULE=on
@@ -25,18 +26,13 @@ builds:
     goarch:
       - amd64
       - arm64
-    ignore:
-      - goos: linux
-        goarch: arm64
-archives:
-  - replacements:
-      darwin: darwin
-      linux: linux
-      amd64: amd64
+#    ignore:
+#      - goos: linux
+#        goarch: arm64
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ .Version }}"
+  version_template: "{{ .Version }}"
 changelog:
   sort: desc
   filters:
@@ -64,11 +60,11 @@ aurs:
 brews:
   -
     skip_upload: "true"
-    tap:
-      owner: Tekwizely
-      name: homebrew-tap
-    folder: Formula
-    #    url_template: "https://github.com/TekWizely/run/archive/{{ .Version }}.tar.gz"
+#    tap:
+#      owner: Tekwizely
+#      name: homebrew-tap
+#    folder: Formula
+    url_template: "https://github.com/TekWizely/run/archive/{{ .Version }}.tar.gz"
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
     license: MIT
     homepage: https://github.com/TekWizely/run
